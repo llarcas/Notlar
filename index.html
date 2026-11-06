@@ -182,42 +182,67 @@ const SB_KEY = "sb_publishable_Ac0nGoU9S88OFaLPkJnYIQ_RuMa7ahR";   // clave púb
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)));
 if(!S.dev){ S.dev=uuid(); save(); }
 if(!S.pending) S.pending=[];
-async function sbInsert(table, rows){
+// Cola de envíos: [{t:"sesiones"|"respuestas", row:{...}}]. Convierte la cola antigua si existe.
+S.pending = S.pending.flatMap(it=>{
+  if(it.t) return [it];
+  if(!it.sesion) return [];
+  const o=it.sesion; const out=[];
+  if(!it.sesOk) out.push({t:"sesiones", row:{id:o.id, alumno:o.alumno, dispositivo:o.dispositivo, modo:o.modo, grupo:o.grupo, total_previsto:o.total}});
+  (it.respuestas||[]).forEach((r,i)=>out.push({t:"respuestas", row:{...r, orden:i+1}}));
+  return out;
+});
+async function sbInsert(table, rows, keepalive){
   const h={"apikey":SB_KEY,"Content-Type":"application/json","Prefer":"return=minimal"};
   if(SB_KEY.startsWith("eyJ")) h["Authorization"]="Bearer "+SB_KEY;
-  const r=await fetch(`${SB_URL}/rest/v1/${table}`,{method:"POST",headers:h,body:JSON.stringify(rows)});
+  const r=await fetch(`${SB_URL}/rest/v1/${table}`,{method:"POST",headers:h,body:JSON.stringify(rows),keepalive:!!keepalive});
+  if(r.status===409) return "dup";
   if(!r.ok) throw new Error(table+" "+r.status+" "+(await r.text()).slice(0,200));
+  return "ok";
 }
-let flushing=false;
-async function flush(){
-  if(!SB_KEY || flushing || !S.pending.length || !navigator.onLine) return;
+let flushing=false, flushAgain=false;
+async function flush(keepalive){
+  if(!SB_KEY || !S.pending.length || !navigator.onLine) return;
+  if(flushing){ flushAgain=true; return; }
   flushing=true;
   try{
     while(S.pending.length){
-      const it=S.pending[0];
-      if(!it.sesOk){ await sbInsert("sesiones",[it.sesion]); it.sesOk=true; save(); }
-      if(it.respuestas.length) await sbInsert("respuestas",it.respuestas);
-      S.pending.shift(); S.lastErr=""; S.lastOk=new Date().toLocaleString("es-ES"); save();
+      const first=S.pending[0];
+      if(first.t==="sesiones"){
+        await sbInsert("sesiones",[first.row],keepalive);
+        S.pending.shift(); save(); continue;
+      }
+      let n=0; while(n<S.pending.length && n<50 && S.pending[n].t==="respuestas") n++;
+      const batch=S.pending.slice(0,n).map(x=>x.row);
+      const res=await sbInsert("respuestas",batch,keepalive);
+      if(res==="dup"){ for(const row of batch) await sbInsert("respuestas",[row],keepalive); }
+      S.pending.splice(0,n); save();
     }
+    S.lastErr=""; S.lastOk=new Date().toLocaleString("es-ES"); save();
   }catch(e){ S.lastErr=e.message; save(); console.warn("Sync pendiente:",e.message); }
   flushing=false;
+  if(flushAgain){ flushAgain=false; flush(); }
 }
-window.addEventListener("online",flush);
-// ---- registro de la ronda en curso
+window.addEventListener("online",()=>flush());
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="hidden") flush(true); });
+window.addEventListener("pagehide",()=>flush(true));
+// ---- registro: cada respuesta se guarda y se envía al momento
 let round=null;
 const MODO={choose:"elige",write:"escribe",sent:"frases",listen:"escucha",cards:"tarjetas"};
-function roundStart(m){ round={id:uuid(), modo:MODO[m], grupo:selName(), t0:Date.now(), log:[]}; }
-function roundLog(verbo, forma, respuesta, correcta){ if(round) round.log.push({verbo,forma,respuesta:String(respuesta||"").slice(0,120),correcta}); }
-function roundEnd(completa){
-  if(!round || !round.log.length){ round=null; return; }
+function roundStart(m, previsto){ round={id:uuid(), modo:MODO[m], grupo:selName(), previsto, n:0, started:false, t0:new Date().toISOString()}; }
+function roundLog(verbo, forma, respuesta, correcta){
+  if(!round) return;
   const alumno=(S.alumno||"Sin nombre").slice(0,40);
-  S.pending.push({sesOk:false,
-    sesion:{id:round.id, alumno, dispositivo:S.dev, modo:round.modo, grupo:round.grupo.slice(0,60),
-            total:round.log.length, aciertos:round.log.filter(x=>x.correcta).length,
-            duracion_seg:Math.min(86400,Math.round((Date.now()-round.t0)/1000)), completa},
-    respuestas:round.log.map(x=>({sesion_id:round.id, alumno, ...x}))});
-  S.pending=S.pending.slice(-100); round=null; save(); flush();
+  if(!round.started){
+    S.pending.push({t:"sesiones", row:{id:round.id, alumno, dispositivo:S.dev, modo:round.modo, grupo:round.grupo.slice(0,60), total_previsto:round.previsto, iniciada_en:round.t0}});
+    round.started=true;
+  }
+  round.n++;
+  S.pending.push({t:"respuestas", row:{sesion_id:round.id, alumno, orden:round.n, verbo, forma, respuesta:String(respuesta||"").slice(0,120), correcta, respondida_en:new Date().toISOString()}});
+  if(S.pending.length>3000) S.pending=S.pending.slice(-3000);
+  save(); flush();
 }
+function roundEnd(){ round=null; }
+
 const today=()=>new Date().toISOString().slice(0,10);
 function markDay(){
   const t=today(); if(S.days[S.days.length-1]===t) return;
@@ -272,7 +297,7 @@ function header(title, back){
 function hud(){ if(!$("lvl")) return; $("lvl").textContent=Math.floor(S.xp/100)+1; $("xp").textContent=S.xp; $("stk").textContent=S.streak; $("xpb").style.width=(S.xp%100)+"%"; }
 
 // ============================ INICIO ============================
-function goHome(){ if(synth) synth.cancel(); if(round) roundEnd(false); screen="home"; renderHome(); window.scrollTo(0,0); }
+function goHome(){ if(synth) synth.cancel(); if(round) roundEnd(); screen="home"; renderHome(); window.scrollTo(0,0); }
 function renderWho(){
   app.innerHTML = header("💪 Irregular Verbs") + `<div class="wrap"><div class="card">
     <h2>👋 ¡Hola! ¿Cómo te llamas?</h2><p class="muted">Solo lo pide la primera vez. Así tu profe puede ver lo que vas practicando.</p>
@@ -318,9 +343,9 @@ function selName(){ return sel==="all"?"Todos":sel==="wrong"?"Mis difíciles":BL
 
 // ============================ TARJETAS ============================
 let cards=[], ci=0, known=0;
-function startCards(){ markDay(); cards=shuffle(pool()); ci=0; known=0; screen="cards"; roundStart("cards"); renderCard(); }
+function startCards(){ markDay(); cards=shuffle(pool()); ci=0; known=0; screen="cards"; roundStart("cards", cards.length); renderCard(); }
 function renderCard(){
-  if(ci>=cards.length){ roundEnd(true); return renderEnd(`Has repasado ${cards.length} tarjetas`, `Te sabías ${known} de ${cards.length}.`, known); }
+  if(ci>=cards.length){ roundEnd(); return renderEnd(`Has repasado ${cards.length} tarjetas`, `Te sabías ${known} de ${cards.length}.`, known); }
   const v=cards[ci]; const blk=BLOCKS.find(b=>b.id===v.b);
   app.innerHTML = header("🃏 "+selName(), true) + `<div class="wrap">
   <div class="prog">${cards.map((_,i)=>`<i class="${i<ci?"ok":i===ci?"now":""}"></i>`).join("")}</div>
@@ -352,16 +377,17 @@ function cardAns(ok){
 let Q=[], qi=0, mode="", res=[], answered=false;
 const TITLES={choose:"👆 Elige", write:"✍️ Escribe", sent:"💬 Frases", listen:"🎧 Escucha"};
 function startQuiz(m){
-  markDay(); mode=m; qi=0; res=[]; screen="quiz"; roundStart(m);
+  markDay(); mode=m; qi=0; res=[]; screen="quiz";
   const base=shuffle(pool());
   const n=Math.min(10, Math.max(base.length, 8));
   Q=[]; let k=0; while(Q.length<n){ Q.push(base[k%base.length]); k++; }
   Q=Q.map(v=>({v, kind: v.inf==="be"&&m==="sent" ? "pp" : (Math.random()<.5?"past":"pp")}));
+  roundStart(m, Q.length);
   renderQ();
 }
 function progBar(){ return `<div class="prog">${Q.map((_,i)=>`<i class="${i<qi?(res[i]?"ok":"ko"):i===qi?"now":""}"></i>`).join("")}</div>`; }
 function renderQ(){
-  if(qi>=Q.length){ roundEnd(true); const ok=res.filter(Boolean).length; return renderEnd(`${ok} de ${Q.length}`, ok===Q.length?"¡Perfecto! Ni un fallo.":ok>=Q.length*0.7?"¡Muy bien! Repasa los que fallaste.":"Vuelve a las Tarjetas de este grupo y repite.", ok); }
+  if(qi>=Q.length){ roundEnd(); const ok=res.filter(Boolean).length; return renderEnd(`${ok} de ${Q.length}`, ok===Q.length?"¡Perfecto! Ni un fallo.":ok>=Q.length*0.7?"¡Muy bien! Repasa los que fallaste.":"Vuelve a las Tarjetas de este grupo y repite.", ok); }
   answered=false;
   const {v,kind}=Q[qi]; const kname = kind==="past"?"pasado":"participio";
   let body="";
@@ -479,7 +505,7 @@ function renderList(){
   <div class="card"><p class="muted" style="margin:0">Practicas como <b>${S.alumno||"?"}</b>. <a href="#" onclick="renderWho();return false">Cambiar nombre</a>${S.pending.length?`<br>Rondas pendientes de enviar: ${S.pending.length} (se envían solas cuando haya conexión)`:""}${S.lastOk?`<br>Último envío correcto: ${S.lastOk}`:""}</p>
     ${S.pending.length?`<button class="btn" style="margin-top:10px" onclick="flush().then(renderList)">↻ Reintentar envío</button>`:""}
     ${S.lastErr?`<p class="muted" style="margin:10px 0 0;color:var(--red);word-break:break-all">Error: ${S.lastErr.replace(/</g,"&lt;")}</p>`:""}
-    <p class="muted" style="margin:8px 0 0;font-size:12px">Versión 2 · registro activado</p></div>
+    <p class="muted" style="margin:8px 0 0;font-size:12px">Versión 3 · cada respuesta se guarda al momento</p></div>
   <button class="btn" id="rst" onclick="resetAll()">Empezar de cero</button></div>`;
   hud(); window.scrollTo(0,0);
 }
