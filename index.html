@@ -182,6 +182,7 @@ const SB_KEY = "sb_publishable_Ac0nGoU9S88OFaLPkJnYIQ_RuMa7ahR";   // clave púb
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)));
 if(!S.dev){ S.dev=uuid(); save(); }
 if(!S.pending) S.pending=[];
+delete S.auth; delete S.perfil;
 // Cola de envíos: [{t:"sesiones"|"respuestas", row:{...}}]. Convierte la cola antigua si existe.
 S.pending = S.pending.flatMap(it=>{
   if(it.t) return [it];
@@ -191,50 +192,28 @@ S.pending = S.pending.flatMap(it=>{
   (it.respuestas||[]).forEach((r,i)=>out.push({t:"respuestas", row:{...r, orden:i+1}}));
   return out;
 });
-// ---- Inicio de sesión (Supabase Auth). El usuario escribe "jonas"; la app usa jonas@example.com
-const LOGIN_DOMAIN = "example.com";
-function jwtExp(t){ try{ return JSON.parse(atob(t.split(".")[1].replace(/-/g,"+").replace(/_/g,"/"))).exp*1000; }catch(e){ return 0; } }
-async function authReq(grant, body){
-  const r=await fetch(`${SB_URL}/auth/v1/token?grant_type=${grant}`,{method:"POST",headers:{"apikey":SB_KEY,"Content-Type":"application/json"},body:JSON.stringify(body)});
-  const j=await r.json().catch(()=>({}));
-  if(!r.ok){ const e=new Error(j.error_description||j.msg||j.message||("auth "+r.status)); e.auth=true; e.status=r.status; throw e; }
-  return j;
-}
-function setSession(j){ S.auth={at:j.access_token, rt:j.refresh_token, exp:jwtExp(j.access_token), uid:(j.user&&j.user.id)||(S.auth&&S.auth.uid)}; save(); }
-async function token(force){
-  if(!S.auth) throw new Error("Sin sesión iniciada");
-  if(!force && Date.now() < S.auth.exp-60000) return S.auth.at;
-  try{ setSession(await authReq("refresh_token",{refresh_token:S.auth.rt})); return S.auth.at; }
-  catch(e){ if(e.auth){ S.auth=null; save(); } throw e; }
-}
+// ---- Inicio de sesión ligero: tabla propia "usuarios" + función entrar()
+function sbHeaders(){ return {"apikey":SB_KEY,"Content-Type":"application/json"}; }
 async function login(user, pass){
-  const u=user.trim().toLowerCase();
-  setSession(await authReq("password",{email:`${u}@${LOGIN_DOMAIN}`, password:pass}));
-  let p=null;
-  try{
-    const r=await fetch(`${SB_URL}/rest/v1/perfiles?select=usuario,nombre,rol&id=eq.${S.auth.uid}`,{headers:{"apikey":SB_KEY,"Authorization":"Bearer "+S.auth.at}});
-    if(r.ok) p=(await r.json())[0];
-  }catch(e){}
-  S.perfil = p || {usuario:u, nombre:u, rol:"alumno"};
-  S.alumno = S.perfil.usuario; save();
+  const r=await fetch(`${SB_URL}/rest/v1/rpc/entrar`,{method:"POST",headers:sbHeaders(),body:JSON.stringify({p_usuario:user, p_password:pass})});
+  if(!r.ok) throw new Error("entrar "+r.status+" "+(await r.text()).slice(0,150));
+  const rows=await r.json();
+  if(!rows.length) { const e=new Error("credenciales"); e.bad=true; throw e; }
+  S.user=rows[0]; S.alumno=S.user.usuario; save();
 }
-function logout(){
-  const at=S.auth&&S.auth.at;
-  if(at) fetch(`${SB_URL}/auth/v1/logout`,{method:"POST",headers:{"apikey":SB_KEY,"Authorization":"Bearer "+at}}).catch(()=>{});
-  S.auth=null; S.perfil=null; save(); renderHome();
-}
-async function sbInsert(table, rows, keepalive, retried){
-  const t=await token();
-  const h={"apikey":SB_KEY,"Authorization":"Bearer "+t,"Content-Type":"application/json","Prefer":"return=minimal"};
+function logout(){ S.user=null; save(); renderHome(); }
+const isProfe = () => !!(S.user && S.user.rol==="profe");
+async function sbInsert(table, rows, keepalive){
+  const h={...sbHeaders(),"Prefer":"return=minimal"};
+  if(SB_KEY.startsWith("eyJ")) h["Authorization"]="Bearer "+SB_KEY;
   const r=await fetch(`${SB_URL}/rest/v1/${table}`,{method:"POST",headers:h,body:JSON.stringify(rows),keepalive:!!keepalive});
-  if(r.status===401 && !retried){ await token(true); return sbInsert(table, rows, keepalive, true); }
   if(r.status===409) return "dup";
   if(!r.ok) throw new Error(table+" "+r.status+" "+(await r.text()).slice(0,200));
   return "ok";
 }
 let flushing=false, flushAgain=false;
 async function flush(keepalive){
-  if(!SB_KEY || !S.auth || !S.pending.length || !navigator.onLine) return;
+  if(!SB_KEY || !S.pending.length || !navigator.onLine) return;
   if(flushing){ flushAgain=true; return; }
   flushing=true;
   try{
@@ -264,7 +243,7 @@ const MODO={choose:"elige",write:"escribe",sent:"frases",listen:"escucha",cards:
 function roundStart(m, previsto){ round={id:uuid(), modo:MODO[m], grupo:selName(), previsto, n:0, started:false, t0:new Date().toISOString()}; }
 function roundLog(verbo, forma, respuesta, correcta){
   if(!round) return;
-  const alumno=((S.perfil&&S.perfil.usuario)||S.alumno||"sin-nombre").slice(0,40);
+  const alumno=((S.user&&S.user.usuario)||S.alumno||"sin-nombre").slice(0,40);
   if(!round.started){
     S.pending.push({t:"sesiones", row:{id:round.id, alumno, dispositivo:S.dev, modo:round.modo, grupo:round.grupo.slice(0,60), total_previsto:round.previsto, iniciada_en:round.t0}});
     round.started=true;
@@ -333,7 +312,7 @@ function hud(){ if(!$("lvl")) return; $("lvl").textContent=Math.floor(S.xp/100)+
 function goHome(){ if(synth) synth.cancel(); if(round) roundEnd(); screen="home"; renderHome(); window.scrollTo(0,0); }
 function renderLogin(msg){
   app.innerHTML = header("💪 Irregular Verbs") + `<div class="wrap"><div class="card">
-    <h2>🔐 Entrar</h2><p class="muted">Escribe tu usuario y tu contraseña. Solo hace falta la primera vez.</p>
+    <h2>🔐 Entrar</h2><p class="muted">Escribe tu usuario y tu contraseña.</p>
     <form id="lf" onsubmit="event.preventDefault();doLogin()">
     <label class="f">Usuario</label><input type="text" id="lu" autocomplete="username" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="next">
     <label class="f">Contraseña</label><input type="password" id="lp" autocomplete="current-password" enterkeyhint="go" style="width:100%;font-size:20px;padding:13px 14px;border:2px solid #CBD5E1;border-radius:14px">
@@ -346,17 +325,17 @@ async function doLogin(){
   if(!u||!p){ (u?$("lp"):$("lu")).focus(); return; }
   if(!navigator.onLine){ $("lmsg").innerHTML='<div class="lose">Para entrar la primera vez necesitas conexión a internet.</div>'; return; }
   $("lb").disabled=true; $("lb").textContent="Entrando…";
-  try{ await login(u,p); toast(`👋 ¡Hola, ${S.perfil.nombre}!`); renderHome(); flush(); }
+  try{ await login(u,p); toast(`👋 ¡Hola, ${S.user.nombre}!`); renderHome(); flush(); }
   catch(e){
-    const m = /invalid login|credentials/i.test(e.message) ? "Usuario o contraseña incorrectos." : "No se ha podido entrar: "+e.message;
+    const m = e.bad ? "Usuario o contraseña incorrectos." : "Ahora no se puede entrar. Comprueba la conexión e inténtalo otra vez.";
     renderLogin(m); $("lu").value=u;
   }
 }
 function renderHome(){
-  if(!S.auth) return renderLogin();
+  if(!S.user) return renderLogin();
   const nWrong=Object.keys(S.wrong).length;
   app.innerHTML = header("💪 Irregular Verbs") + `<div class="wrap">
-  <p class="muted" style="margin:0 4px 10px">Hola, <b>${(S.perfil&&S.perfil.nombre)||S.alumno}</b>${S.perfil&&S.perfil.rol==="profe"?" · 🎓 modo profe":""}</p>
+  <p class="muted" style="margin:0 4px 10px">Hola, <b>${S.user.nombre}</b>${isProfe()?" · 🎓 modo profe":""}</p>
   <div class="card"><h2>1. Elige un grupo</h2>
     <div class="blocks">${BLOCKS.map(b=>`<button class="block ${sel===b.id?"sel":""}" style="background:${b.color}" onclick="pick('${b.id}')">
       <div><b>${b.name}</b><br><small>${b.verbs.length} verbos · ${b.verbs.slice(0,3).map(v=>v[0]).join(", ")}…</small></div>
@@ -549,14 +528,14 @@ function renderList(){
     <div class="vrow" style="font-size:12px;color:var(--grey);font-weight:700"><span>INFINITIVO</span><span>PASADO</span><span>PARTICIPIO</span><span></span></div>
     ${b.verbs.map(v=>`<div class="vrow" onclick="sayForms(BY['${v[0]}'])"><span><b>${v[0]}</b><br><span class="muted" style="font-size:12px">${v[3]}</span></span><span class="p1">${v[1]}</span><span class="p2">${v[2]}</span>
       <span class="dots">${[1,2,3,4,5].map(k=>`<i class="${mastery(v[0])>=k?"on":""}"></i>`).join("")}</span></div>`).join("")}</div>`).join("")}
-  <div class="card"><p class="muted" style="margin:0">Has entrado como <b>${(S.perfil&&S.perfil.usuario)||"?"}</b>. <a href="#" onclick="logout();return false">Cerrar sesión</a>${S.pending.length?`<br>Rondas pendientes de enviar: ${S.pending.length} (se envían solas cuando haya conexión)`:""}${S.lastOk?`<br>Último envío correcto: ${S.lastOk}`:""}</p>
+  <div class="card"><p class="muted" style="margin:0">Has entrado como <b>${S.user.usuario}</b>. <a href="#" onclick="logout();return false">Cerrar sesión</a></p>
+  ${isProfe()?`<p class="muted" style="margin:10px 0 0">🎓 Solo visible para la profe · Versión 5<br>Pendientes de enviar en este dispositivo: ${S.pending.length}${S.lastOk?`<br>Último envío correcto: ${S.lastOk}`:""}</p>
     ${S.pending.length?`<button class="btn" style="margin-top:10px" onclick="flush().then(renderList)">↻ Reintentar envío</button>`:""}
-    ${S.lastErr?`<p class="muted" style="margin:10px 0 0;color:var(--red);word-break:break-all">Error: ${S.lastErr.replace(/</g,"&lt;")}</p>`:""}
-    <p class="muted" style="margin:8px 0 0;font-size:12px">Versión 4 · con inicio de sesión</p></div>
+    ${S.lastErr?`<p class="muted" style="margin:10px 0 0;color:var(--red);word-break:break-all">Error: ${S.lastErr.replace(/</g,"&lt;")}</p>`:""}`:""}</div>
   <button class="btn" id="rst" onclick="resetAll()">Empezar de cero</button></div>`;
   hud(); window.scrollTo(0,0);
 }
-function resetAll(){ const b=$("rst"); if(!b.dataset.c){ b.dataset.c=1; b.textContent="Pulsa otra vez para borrar tu progreso"; return; } S={...DEF,m:{},wrong:{},days:[],alumno:S.alumno,dev:S.dev,pending:S.pending,auth:S.auth,perfil:S.perfil}; save(); renderList(); toast("Progreso borrado"); }
+function resetAll(){ const b=$("rst"); if(!b.dataset.c){ b.dataset.c=1; b.textContent="Pulsa otra vez para borrar tu progreso"; return; } S={...DEF,m:{},wrong:{},days:[],alumno:S.alumno,dev:S.dev,pending:S.pending,user:S.user}; save(); renderList(); toast("Progreso borrado"); }
 
 renderHome(); flush();
 </script>

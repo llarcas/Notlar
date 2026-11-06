@@ -2,31 +2,62 @@
 --  Irregular Verbs · esquema de base de datos (Supabase / PostgreSQL)
 --  Ejecutar en: Supabase > SQL Editor > New query > Run
 --  Se puede ejecutar varias veces: crea lo que falta y actualiza lo que
---  ya existe (versión 3: inicio de sesión con Supabase Auth).
+--  ya existe (versión 4: usuarios propios, sin Supabase Auth).
 -- =====================================================================
+
+create extension if not exists pgcrypto with schema extensions;
 
 -- Las vistas se recrean al final
 drop schema if exists informes cascade;
 
--- ---------------------------------------------------------------------
--- 0. Perfiles: datos de cada usuario de Supabase Auth (alumno o profe)
---    Los usuarios se crean en Authentication > Users (ver usuarios.sql)
--- ---------------------------------------------------------------------
-create table if not exists public.perfiles (
-  id         uuid primary key references auth.users(id) on delete cascade,
-  usuario    text not null unique check (usuario ~ '^[a-z0-9._-]{2,30}$'),
-  nombre     text not null check (char_length(nombre) between 1 and 40),
-  rol        text not null default 'alumno' check (rol in ('alumno','profe')),
-  creado_en  timestamptz not null default now()
-);
+-- Limpieza de la versión con Supabase Auth (si se llegó a ejecutar)
+drop policy if exists "insertar mis sesiones"   on public.sesiones;
+drop policy if exists "ver sesiones"            on public.sesiones;
+drop policy if exists "insertar mis respuestas" on public.respuestas;
+drop policy if exists "ver respuestas"          on public.respuestas;
+drop table    if exists public.perfiles cascade;
+drop function if exists public.es_profe();
 
--- ¿El usuario conectado es profe? (security definer para no entrar en bucle con RLS)
-create or replace function public.es_profe() returns boolean
-language sql stable security definer set search_path = public as $$
-  select exists (select 1 from public.perfiles where id = auth.uid() and rol = 'profe');
+-- ---------------------------------------------------------------------
+-- 0. Usuarios de la app (control ligero, no es autenticación fuerte)
+-- ---------------------------------------------------------------------
+create table if not exists public.usuarios (
+  usuario        text primary key check (usuario ~ '^[a-z0-9._-]{2,30}$'),
+  nombre         text not null check (char_length(nombre) between 1 and 40),
+  rol            text not null default 'alumno' check (rol in ('alumno','profe')),
+  password_hash  text not null,
+  activo         boolean not null default true,
+  creado_en      timestamptz not null default now()
+);
+alter table public.usuarios enable row level security;     -- sin políticas: nadie la lee desde la app
+revoke all on public.usuarios from anon, authenticated;
+
+-- Alta o cambio de contraseña:  select public.crear_usuario('ana', 'Ana', 'alumno', 'clave');
+create or replace function public.crear_usuario(p_usuario text, p_nombre text, p_rol text, p_password text)
+returns void language sql security definer set search_path = public, extensions as $$
+  insert into public.usuarios (usuario, nombre, rol, password_hash)
+  values (lower(p_usuario), p_nombre, p_rol, crypt(p_password, gen_salt('bf')))
+  on conflict (usuario) do update
+     set nombre = excluded.nombre, rol = excluded.rol, password_hash = excluded.password_hash, activo = true;
 $$;
-revoke execute on function public.es_profe() from public, anon;
-grant execute on function public.es_profe() to authenticated;
+revoke execute on function public.crear_usuario(text,text,text,text) from public, anon, authenticated;
+
+-- La app llama a esto para entrar: devuelve el usuario si la contraseña es correcta, o nada
+create or replace function public.entrar(p_usuario text, p_password text)
+returns table (usuario text, nombre text, rol text)
+language sql security definer set search_path = public, extensions as $$
+  select u.usuario, u.nombre, u.rol
+  from public.usuarios u
+  where u.usuario = lower(trim(p_usuario))
+    and u.activo
+    and u.password_hash = crypt(p_password, u.password_hash);
+$$;
+revoke execute on function public.entrar(text,text) from public;
+grant execute on function public.entrar(text,text) to anon;
+
+-- Usuarios iniciales
+select public.crear_usuario('jonas',   'Jonas', 'alumno', 'jonas');
+select public.crear_usuario('llarcas', 'Lucía', 'profe',  'admin');
 
 -- ---------------------------------------------------------------------
 -- 1. Sesiones: una fila por ronda, se crea al contestar la primera
@@ -45,11 +76,11 @@ create table if not exists public.sesiones (
 );
 alter table public.sesiones add column if not exists total_previsto int check (total_previsto between 0 and 200);
 alter table public.sesiones add column if not exists iniciada_en timestamptz;
-alter table public.sesiones add column if not exists user_id uuid default auth.uid() references auth.users(id) on delete set null;
 alter table public.sesiones drop column if exists total;
 alter table public.sesiones drop column if exists aciertos;
 alter table public.sesiones drop column if exists duracion_seg;
 alter table public.sesiones drop column if exists completa;
+alter table public.sesiones drop column if exists user_id;
 
 -- ---------------------------------------------------------------------
 -- 2. Respuestas: una fila por pregunta, se envía al contestarla
@@ -68,46 +99,29 @@ create table if not exists public.respuestas (
 );
 alter table public.respuestas add column if not exists orden int check (orden between 1 and 500);
 alter table public.respuestas add column if not exists respondida_en timestamptz;
-alter table public.respuestas add column if not exists user_id uuid default auth.uid() references auth.users(id) on delete set null;
+alter table public.respuestas drop column if exists user_id;
 
 create unique index if not exists respuestas_sesion_orden_uq on public.respuestas (sesion_id, orden);
 create index if not exists respuestas_alumno_verbo_idx on public.respuestas (alumno, verbo);
 create index if not exists sesiones_alumno_fecha_idx on public.sesiones (alumno, creada_en desc);
 
 -- ---------------------------------------------------------------------
--- 3. Seguridad
---    · Sin iniciar sesión (anon): nada de nada.
---    · Alumno: inserta solo filas suyas y puede leer solo lo suyo.
---    · Profe: además puede leer todo.
+-- 3. Seguridad: la app (rol anon) SOLO puede insertar en sesiones y
+--    respuestas, y llamar a entrar(). Nada más.
 -- ---------------------------------------------------------------------
-alter table public.perfiles   enable row level security;
 alter table public.sesiones   enable row level security;
 alter table public.respuestas enable row level security;
 
-revoke all on public.perfiles, public.sesiones, public.respuestas from anon, authenticated;
-grant select on public.perfiles to authenticated;
-grant select, insert on public.sesiones, public.respuestas to authenticated;
+revoke all on public.sesiones, public.respuestas from anon, authenticated;
+grant insert on public.sesiones, public.respuestas to anon;
 
-drop policy if exists "app inserta sesiones"   on public.sesiones;
+drop policy if exists "app inserta sesiones" on public.sesiones;
+create policy "app inserta sesiones" on public.sesiones
+  for insert to anon with check (true);
+
 drop policy if exists "app inserta respuestas" on public.respuestas;
-
-drop policy if exists "ver perfiles" on public.perfiles;
-create policy "ver perfiles" on public.perfiles
-  for select to authenticated using (id = auth.uid() or public.es_profe());
-
-drop policy if exists "insertar mis sesiones" on public.sesiones;
-create policy "insertar mis sesiones" on public.sesiones
-  for insert to authenticated with check (user_id = auth.uid());
-drop policy if exists "ver sesiones" on public.sesiones;
-create policy "ver sesiones" on public.sesiones
-  for select to authenticated using (user_id = auth.uid() or public.es_profe());
-
-drop policy if exists "insertar mis respuestas" on public.respuestas;
-create policy "insertar mis respuestas" on public.respuestas
-  for insert to authenticated with check (user_id = auth.uid());
-drop policy if exists "ver respuestas" on public.respuestas;
-create policy "ver respuestas" on public.respuestas
-  for select to authenticated using (user_id = auth.uid() or public.es_profe());
+create policy "app inserta respuestas" on public.respuestas
+  for insert to anon with check (true);
 
 -- ---------------------------------------------------------------------
 -- 4. Informes para ti (esquema aparte, NO expuesto a la app)
