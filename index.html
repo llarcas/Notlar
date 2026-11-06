@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Irregular Verbs</title>
+<style>
+:root{--dark:#1E293B;--purple:#6C3FC5;--pink:#D6197A;--teal:#0D9488;--green:#16A34A;--gold:#B45309;--indigo:#4338CA;
+--greenl:#DCFCE7;--goldl:#FEF3C7;--redl:#FEE2E2;--red:#DC2626;--grey:#64748B;--bg:#F1F5F9;--line:#E2E8F0}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--dark);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 16px) env(safe-area-inset-left)}
+button{font-family:inherit}
+.wrap{max-width:560px;margin:0 auto;padding:0 14px}
+header{background:var(--dark);color:#fff;padding:14px 16px 16px;border-radius:0 0 22px 22px;margin-bottom:14px}
+.stripes{display:flex;height:4px;border-radius:4px;overflow:hidden;margin-bottom:12px}.stripes i{flex:1}
+.hrow{display:flex;align-items:center;gap:10px}
+header h1{font-size:20px;margin:0;flex:1}
+.bk{background:rgba(255,255,255,.12);border:0;color:#fff;font-size:18px;width:38px;height:38px;border-radius:12px}
+.hud{display:flex;gap:8px;margin-top:12px;font-size:13px}
+.hud span{background:rgba(255,255,255,.1);padding:6px 10px;border-radius:999px;white-space:nowrap}
+.xpbar{flex:1;height:8px;background:rgba(255,255,255,.15);border-radius:6px;overflow:hidden;align-self:center}
+.xpbar b{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--teal),var(--green));transition:width .4s}
+.card{background:#fff;border-radius:18px;padding:16px;box-shadow:0 2px 10px rgba(15,23,42,.06);margin-bottom:12px}
+h2{font-size:17px;margin:4px 0 10px}
+.muted{color:var(--grey);font-size:14px;line-height:1.4}
+.blocks{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.block{border:0;border-radius:16px;padding:14px 12px;text-align:left;color:#fff;min-height:108px;display:flex;flex-direction:column;justify-content:space-between}
+.block b{font-size:15px;line-height:1.2}
+.block small{font-size:12px;opacity:.9}
+.mbar{height:6px;border-radius:4px;background:rgba(255,255,255,.3);overflow:hidden;margin-top:8px}
+.mbar i{display:block;height:100%;background:#fff}
+.block.sel{outline:4px solid var(--dark);outline-offset:2px}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mode{border:2px solid var(--line);background:#fff;border-radius:16px;padding:14px 12px;text-align:left}
+.mode .ic{font-size:26px}
+.mode b{display:block;font-size:15px;margin-top:4px}
+.mode small{color:var(--grey);font-size:12.5px}
+.btn{border:0;border-radius:14px;padding:14px 16px;font-size:16px;font-weight:700;background:var(--line);color:var(--dark);width:100%}
+.btn.p{background:var(--purple);color:#fff}.btn.g{background:var(--green);color:#fff}.btn.k{background:var(--indigo);color:#fff}
+.btn:active{transform:scale(.98)}
+.row{display:flex;gap:10px}
+.row>*{flex:1}
+.chiprow{display:flex;gap:8px;flex-wrap:wrap}
+.chipb{border:2px solid var(--line);background:#fff;border-radius:999px;padding:8px 12px;font-size:14px;font-weight:600}
+.chipb.on{border-color:var(--purple);background:#EDE9FE;color:var(--purple)}
+.prog{display:flex;gap:4px;margin-bottom:12px}
+.prog i{flex:1;height:6px;border-radius:4px;background:var(--line)}
+.prog i.ok{background:var(--green)}.prog i.ko{background:var(--red)}.prog i.now{background:var(--purple)}
+/* flashcard */
+.flip{perspective:1200px;margin-bottom:12px}
+.fc{position:relative;height:360px;transition:transform .5s;transform-style:preserve-3d}
+.fc.on{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:22px;padding:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.front{background:linear-gradient(145deg,var(--purple),var(--indigo));color:#fff}
+.backf{background:#fff;transform:rotateY(180deg);box-shadow:0 2px 14px rgba(15,23,42,.1);justify-content:flex-start}
+.front .inf{font-size:46px;font-weight:800}
+.front .es{font-size:18px;opacity:.85;margin-top:6px}
+.front .tap{position:absolute;bottom:16px;font-size:13px;opacity:.7}
+.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:100%;margin-top:4px}
+.trio div{border-radius:12px;padding:8px 4px}
+.trio small{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;opacity:.8}
+.trio b{font-size:17px}.trio.sm b{font-size:14px}.trio.sm div{padding:8px 2px}
+.t1{background:#EDE9FE;color:var(--purple)}.t2{background:#FCE7F3;color:var(--pink)}.t3{background:#CCFBF1;color:var(--teal)}
+.ex{font-size:15px;text-align:left;width:100%;margin-top:10px;line-height:1.45}
+.ex p{margin:6px 0}
+.ex b{color:var(--pink)}.ex b.pp{color:var(--teal)}
+.say{border:0;background:var(--bg);border-radius:10px;padding:4px 8px;font-size:15px;margin-left:4px}
+.spk{border:0;background:rgba(255,255,255,.18);color:#fff;border-radius:14px;padding:10px 16px;font-size:16px;margin-top:16px}
+/* quiz */
+.q{font-size:15px;color:var(--grey);text-transform:uppercase;letter-spacing:.6px;font-weight:700}
+.qbig{font-size:38px;font-weight:800;margin:6px 0 2px}
+.qes{color:var(--grey);margin-bottom:6px}
+.sent{font-size:20px;line-height:1.5;margin:8px 0}
+.sent .gap{display:inline-block;min-width:90px;border-bottom:3px solid var(--purple);color:var(--purple);font-weight:800;text-align:center}
+.opts{display:grid;gap:10px;margin-top:12px}
+.opt{border:2px solid var(--line);background:#fff;border-radius:14px;padding:15px;font-size:19px;font-weight:700;text-align:center}
+.opt.ok{border-color:var(--green);background:var(--greenl);color:#166534}
+.opt.ko{border-color:var(--red);background:var(--redl);color:#991B1B}
+label.f{display:block;font-size:13px;font-weight:700;color:var(--grey);margin:12px 0 4px;text-transform:uppercase;letter-spacing:.5px}
+input[type=text]{width:100%;font-size:20px;padding:13px 14px;border:2px solid #CBD5E1;border-radius:14px;font-family:inherit;-webkit-appearance:none}
+input[type=text]:focus{outline:none;border-color:var(--purple)}
+input.ok{border-color:var(--green);background:var(--greenl)}input.ko{border-color:var(--red);background:var(--redl)}
+.fb{margin-top:12px}
+.win{background:var(--greenl);border-left:5px solid var(--green);border-radius:12px;padding:12px;font-weight:700}
+.lose{background:var(--redl);border-left:5px solid var(--red);border-radius:12px;padding:12px}
+.trap{background:var(--goldl);border-left:5px solid var(--gold);border-radius:12px;padding:12px;margin-top:8px;font-size:15px;line-height:1.45}
+.trap b.h{color:var(--gold)}
+.big{font-size:54px;text-align:center;margin:6px 0}
+.center{text-align:center}
+.list{display:grid;gap:6px}
+.vrow{display:grid;grid-template-columns:1.1fr 1fr 1fr 22px;gap:6px;align-items:center;font-size:15px;padding:8px 6px;border-bottom:1px solid var(--line)}
+.vrow b{color:var(--dark)}.vrow .p1{color:var(--pink);font-weight:600}.vrow .p2{color:var(--teal);font-weight:600}
+.dots{display:flex;gap:2px}.dots i{width:4px;height:12px;border-radius:2px;background:var(--line)}.dots i.on{background:var(--green)}
+.toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 14px);transform:translate(-50%,-140px);background:var(--dark);color:#fff;padding:12px 18px;border-radius:14px;font-weight:700;transition:transform .35s;z-index:9;max-width:90%;text-align:center}
+.toast.show{transform:translate(-50%,0)}
+.hidden{display:none!important}
+.tip{background:#EDE9FE;border-radius:14px;padding:12px;font-size:14.5px;line-height:1.45}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+<script>
+// ============================ DATOS ============================
+// [infinitivo, pasado, participio, español, frase pasado, frase participio, trampa]
+const BLOCKS = [
+ {id:"b1", name:"Los imprescindibles", color:"#6C3FC5", tip:"Estos 10 salen en todos los exámenes. Si solo te aprendes un grupo, que sea este.", verbs:[
+  ["be","was / were","been","ser, estar","Yesterday I ___ very tired.","Have you ever ___ to Portugal?","<i>was</i> con I / he / she / it y <i>were</i> con you / we / they. El participio <i>been</i> suena /bin/."],
+  ["go","went","gone","ir","We ___ to the beach last Sunday.","My mum has ___ to the supermarket.","<i>went</i> no se parece nada a <i>go</i>: hay que sabérselo de memoria."],
+  ["have","had","had","tener","I ___ a sandwich for lunch yesterday.","We have ___ this cat for three years.","Pasado y participio iguales: <i>had</i>. En present perfect queda raro pero es correcto: <i>I have had</i>."],
+  ["do","did","done","hacer","She ___ her homework after dinner.","Have you ___ the exercises yet?","<i>did</i> en pasado y <i>done</i> en participio. Nunca <i>I have did</i>."],
+  ["see","saw","seen","ver","I ___ a fox in the garden last night.","I have never ___ the sea in winter.","<i>I have saw</i> es un error típico: con have va <i>seen</i>."],
+  ["eat","ate","eaten","comer","They ___ pizza on Friday.","Have you ever ___ octopus?","<i>ate</i> se pronuncia /eit/ y <i>eaten</i> /íten/."],
+  ["make","made","made","hacer, fabricar","My grandma ___ a chocolate cake yesterday.","I have ___ a new friend at school.","Pasado y participio iguales: <i>made</i>. No confundas con <i>do</i>."],
+  ["take","took","taken","coger, llevar","We ___ the bus to Vigo.","She has ___ lots of photos of the river.","<i>took</i> en pasado (con doble o) y <i>taken</i> en participio."],
+  ["buy","bought","bought","comprar","My dad ___ a new guitar last week.","I have just ___ the tickets for the concert.","No confundas <i>bought</i> (de buy, comprar) con <i>brought</i> (de bring, traer). La r marca la diferencia."],
+  ["write","wrote","written","escribir","Cervantes ___ <i>Don Quixote</i>.","Have you ___ the email to your teacher?","<i>written</i> lleva doble t; <i>wrote</i>, una sola."]]},
+ {id:"b2", name:"Los que casi no cambian", color:"#0D9488", tip:"Fáciles: o son iguales los tres (put, put, put) o el participio vuelve a ser como el infinitivo (come, came, come).", verbs:[
+  ["put","put","put","poner","I ___ my keys on the table an hour ago.","Who has ___ salt in my coffee?","Los tres iguales: <i>put, put, put</i>. Nunca <i>putted</i>."],
+  ["cut","cut","cut","cortar","She ___ the bread with a big knife.","Dad has ___ the grass in the garden.","Los tres iguales: <i>cut, cut, cut</i>."],
+  ["read","read","read","leer","I ___ a great book last summer.","Have you ___ the instructions?","Se escribe igual, pero en pasado y participio se pronuncia /red/, como el color <i>red</i>."],
+  ["let","let","let","dejar, permitir","My parents ___ me go to the party.","The teacher has ___ us leave early today.","Los tres iguales: <i>let, let, let</i>."],
+  ["hit","hit","hit","golpear","A branch ___ the window during the storm.","The storm has ___ the north of Spain.","Los tres iguales: <i>hit, hit, hit</i>."],
+  ["cost","cost","cost","costar","My new trainers ___ sixty euros.","This trip has ___ more than we expected.","Los tres iguales: <i>cost, cost, cost</i>."],
+  ["come","came","come","venir","My cousins ___ to visit us at Christmas.","Spring has ___ early this year.","El participio vuelve a ser como el infinitivo: <i>come, came, come</i>."],
+  ["become","became","become","convertirse, llegar a ser","She ___ a doctor in 2015.","This song has ___ very popular.","Como <i>come</i>: <i>become, became, become</i>."],
+  ["run","ran","run","correr","The dog ___ across the park.","I have never ___ a marathon.","El participio es igual que el infinitivo: <i>run, ran, run</i>."]]},
+ {id:"b3", name:"Pasado = participio (I)", color:"#D6197A", tip:"En este grupo el pasado y el participio son iguales: aprendes una palabra y tienes dos.", verbs:[
+  ["bring","brought","brought","traer","Marta ___ a cake to the class party.","Have you ___ your science book?","<i>brought</i> (de bring, traer) lleva r. <i>bought</i> (de buy, comprar) no."],
+  ["think","thought","thought","pensar","I ___ the film was boring.","I have ___ about your idea.","<i>thought</i>: t-h-o-u-g-h-t. Suena /zot/."],
+  ["teach","taught","taught","enseñar","My grandfather ___ me to swim.","Mrs Pérez has ___ English for twenty years.","<i>taught</i> se escribe con <b>augh</b>, igual que <i>caught</i>."],
+  ["catch","caught","caught","coger, atrapar","The cat ___ a mouse this morning.","Have you ever ___ a fish?","<i>caught</i> se escribe con <b>augh</b>. Nunca <i>catched</i>."],
+  ["tell","told","told","contar, decir","She ___ me a funny story.","Have you ___ your parents about the trip?","<i>told</i> en los dos. <i>tell</i> es contar algo a alguien: <i>tell me</i>."],
+  ["sell","sold","sold","vender","They ___ their old car last year.","The shop has ___ all the ice cream.","Como <i>tell</i>: <i>sell, sold, sold</i>."],
+  ["send","sent","sent","enviar","I ___ you a message yesterday.","She has ___ the photos to everybody.","La d final se convierte en t: <i>send → sent</i>."],
+  ["sleep","slept","slept","dormir","I ___ ten hours on Saturday.","The baby has ___ all afternoon.","La doble e se queda en una y se añade t: <i>sleep → slept</i>. Igual que <i>feel → felt</i>."],
+  ["feel","felt","felt","sentir(se)","I ___ nervous before the exam.","I have never ___ so happy!","<i>felt</i> viene de feel (sentir). <i>fell</i> viene de fall (caer). Muy fáciles de liar."],
+  ["meet","met","met","conocer, quedar","We ___ our new neighbours yesterday.","Have you ___ my sister?","<i>met</i> con una sola t y una sola e."]]},
+ {id:"b4", name:"Pasado = participio (II)", color:"#B45309", tip:"Más verbos con pasado y participio iguales. Fíjate en cómo se escriben, que aquí está la trampa.", verbs:[
+  ["find","found","found","encontrar","I ___ ten euros in my jacket!","Have you ___ your phone?","<i>found</i>, con <b>ou</b>. Nunca <i>finded</i>."],
+  ["hear","heard","heard","oír","We ___ a strange noise in the kitchen.","Have you ___ this song before?","<i>heard</i> = hear + d. Suena /jerd/."],
+  ["leave","left","left","irse, dejar","The train ___ at seven o'clock.","I have ___ my umbrella at school.","<i>left</i> se escribe como izquierda, pero aquí significa se fue o dejó."],
+  ["lose","lost","lost","perder","My brother ___ his keys again.","I have ___ my pencil case.","<i>lose</i> (perder) lleva una o. <i>loose</i>, con dos, significa suelto."],
+  ["pay","paid","paid","pagar","My aunt ___ for the dinner.","Have you ___ for the tickets?","La y se convierte en i: <i>paid</i>. Nunca <i>payed</i>."],
+  ["say","said","said","decir","The teacher ___ the exam was easy.","I have ___ sorry three times!","La y se convierte en i: <i>said</i>. Suena /sed/."],
+  ["understand","understood","understood","entender","I ___ the explanation perfectly.","Have you ___ the exercise?","Es <i>under</i> + <i>stand</i>: stand, stood, stood."],
+  ["win","won","won","ganar","Our class ___ the science competition.","She has ___ three music prizes.","<i>won</i> se pronuncia igual que <i>one</i>."],
+  ["get","got","got","conseguir, recibir, llegar","I ___ a lot of presents for my birthday.","My marks have ___ better this term.","En inglés británico el participio es <i>got</i>; en americano, <i>gotten</i>. Los dos valen."],
+  ["sit","sat","sat","sentarse","We ___ in the front row at the cinema.","I have ___ here for an hour.","<i>sat</i> con a. No confundas con <i>set</i>."]]},
+ {id:"b5", name:"Las tres distintas (I)", color:"#4338CA", tip:"Aquí cambian las tres. Busca el patrón: drink, drank, drunk (i → a → u) o fly, flew, flown.", verbs:[
+  ["begin","began","begun","empezar","The concert ___ at nine.","The film has already ___.","Patrón i → a → u: <i>begin, began, begun</i>."],
+  ["break","broke","broken","romper","I ___ my glasses yesterday.","Oh no! Someone has ___ the vase.","<i>broke</i> en pasado, <i>broken</i> en participio (con -n)."],
+  ["choose","chose","chosen","elegir","She ___ the blue dress.","Have you ___ a book for the project?","<i>choose</i> (dos o) en presente; <i>chose</i> (una o) en pasado; <i>chosen</i> en participio."],
+  ["drink","drank","drunk","beber","We ___ hot chocolate after the walk.","I have ___ two glasses of water.","Patrón i → a → u: <i>drink, drank, drunk</i>."],
+  ["drive","drove","driven","conducir","My mum ___ to Santiago on Monday.","My uncle has ___ a lorry for ten years.","<i>drove</i> en pasado y <i>driven</i> en participio. Como <i>write, wrote, written</i>."],
+  ["fall","fell","fallen","caer(se)","I ___ off my bike last summer.","Lots of leaves have ___ from the trees.","<i>fell</i> es de fall (caer). <i>felt</i> es de feel (sentir)."],
+  ["fly","flew","flown","volar","The birds ___ south in autumn.","Have you ever ___ in a plane?","<i>flew</i> en pasado y <i>flown</i> en participio. Nunca <i>flied</i>."],
+  ["forget","forgot","forgotten","olvidar","I ___ my friend's birthday!","I have ___ her name.","<i>forgotten</i> lleva doble t."]]},
+ {id:"b6", name:"Las tres distintas (II)", color:"#16A34A", tip:"Últimos patrones: sing, sang, sung (i → a → u) y grow, grew, grown (ew → wn).", verbs:[
+  ["give","gave","given","dar","My grandparents ___ me a watch.","The teacher has ___ us a lot of homework.","<i>gave</i> en pasado y <i>given</i> en participio."],
+  ["know","knew","known","saber, conocer","I ___ the answer, but I was too shy.","I have ___ Lucas since primary school.","La k no suena: /nou/, /niu/, /noun/. Patrón como <i>grow, grew, grown</i>."],
+  ["sing","sang","sung","cantar","We ___ songs around the campfire.","She has ___ in a choir for years.","Patrón i → a → u: <i>sing, sang, sung</i>."],
+  ["speak","spoke","spoken","hablar","He ___ to the head teacher this morning.","Have you ever ___ to a famous person?","<i>spoke</i> en pasado y <i>spoken</i> en participio (con -n)."],
+  ["swim","swam","swum","nadar","We ___ in the river last summer.","I have never ___ in the ocean.","Patrón i → a → u: <i>swim, swam, swum</i>."],
+  ["wear","wore","worn","llevar puesto","She ___ a red coat to the party.","I have ___ these shoes every day this week.","<i>wore</i> en pasado y <i>worn</i> en participio."],
+  ["grow","grew","grown","crecer, cultivar","My grandad ___ tomatoes in his garden.","Wow, you have ___ a lot!","Patrón ew → wn: <i>grow, grew, grown</i>."],
+  ["draw","drew","drawn","dibujar","My sister ___ a beautiful horse.","Have you ever ___ a map?","Patrón ew → wn: <i>draw, drew, drawn</i>."]]}
+];
+const ALL = []; BLOCKS.forEach(b=>b.verbs.forEach(v=>ALL.push({b:b.id, inf:v[0], past:v[1], pp:v[2], es:v[3], sp:v[4], spp:v[5], trap:v[6]})));
+const BY = Object.fromEntries(ALL.map(v=>[v.inf,v]));
+
+// ============================ ESTADO ============================
+const KEY="irregulars_jonas_v1";
+const DEF={xp:0, m:{}, wrong:{}, days:[], streak:0};
+let S; try{ S=Object.assign({},DEF,JSON.parse(localStorage.getItem(KEY)||"{}")); }catch(e){ S={...DEF}; }
+function save(){ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){} }
+const today=()=>new Date().toISOString().slice(0,10);
+function markDay(){
+  const t=today(); if(S.days[S.days.length-1]===t) return;
+  const y=new Date(Date.now()-864e5).toISOString().slice(0,10);
+  S.streak = S.days[S.days.length-1]===y ? S.streak+1 : 1;
+  S.days.push(t); S.days=S.days.slice(-60); save();
+  if(S.streak>1) toast(`🔥 ¡${S.streak} días seguidos practicando!`);
+}
+const mastery = inf => S.m[inf]||0;           // 0..5
+function bump(inf, ok){
+  const before=mastery(inf);
+  S.m[inf] = ok ? Math.min(5,before+1) : Math.max(0,before-2);
+  if(ok){ if(S.wrong[inf]) S.wrong[inf]=Math.max(0,S.wrong[inf]-1); } else S.wrong[inf]=(S.wrong[inf]||0)+1;
+  if(S.wrong[inf]===0) delete S.wrong[inf];
+  save();
+}
+function gain(n){ const L=Math.floor(S.xp/100); S.xp+=n; if(Math.floor(S.xp/100)>L) toast(`🎉 ¡Nivel ${Math.floor(S.xp/100)+1}!`); save(); hud(); }
+function blockPct(b){ const vs=BLOCKS.find(x=>x.id===b).verbs; return Math.round(vs.reduce((a,v)=>a+mastery(v[0]),0)/(vs.length*5)*100); }
+
+// ============================ VOZ ============================
+const synth=window.speechSynthesis; let voice=null;
+function pickVoice(){ if(!synth) return; const vs=synth.getVoices().filter(v=>/^en/i.test(v.lang));
+  voice = vs.find(v=>/en-GB/i.test(v.lang)&&/Daniel|Serena|Kate|Google/i.test(v.name)) || vs.find(v=>/en-GB/i.test(v.lang)) || vs.find(v=>/en-US/i.test(v.lang)) || vs[0] || null; }
+if(synth){ pickVoice(); synth.onvoiceschanged=pickVoice; }
+function speak(text, rate=0.85){
+  if(!synth){ toast("Este navegador no puede leer en voz alta"); return; }
+  try{ synth.cancel(); const u=new SpeechSynthesisUtterance(text.replace(/<[^>]+>/g,"").replace(/___/g,"...")); u.lang=voice?voice.lang:"en-GB"; if(voice) u.voice=voice; u.rate=rate; synth.speak(u);}catch(e){}
+}
+const sayForms = v => speak(`${v.inf}. ${v.past.replace(" / "," or ")}. ${v.pp}.`, 0.75);
+
+// ============================ UTIL ============================
+const $=id=>document.getElementById(id);
+const app=$("app");
+function toast(m){ const t=$("toast"); t.innerHTML=m; t.classList.add("show"); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove("show"),1900); }
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+const norm = s => s.toLowerCase().replace(/[‘’]/g,"'").replace(/\s+/g," ").trim();
+function accepts(v, kind){
+  if(kind==="past") return v.inf==="be" ? ["was","were","was / were","was/were","were / was","were/was"] : [v.past];
+  return v.inf==="get" ? ["got","gotten"] : [v.pp];
+}
+const isOk = (v,kind,typed) => accepts(v,kind).includes(norm(typed));
+function regular(b){ if(/e$/.test(b)) return b+"d"; if(/[^aeiou]y$/.test(b)) return b.slice(0,-1)+"ied"; return b+"ed"; }
+function hl(sentence, form, cls){ return sentence.replace("___", `<b class="${cls||""}">${form}</b>`); }
+
+// ============================ CABECERA ============================
+let screen="home", sel="b1";
+function header(title, back){
+  return `<header><div class="stripes"><i style="background:#6C3FC5"></i><i style="background:#D6197A"></i><i style="background:#0D9488"></i><i style="background:#B45309"></i><i style="background:#4338CA"></i></div>
+  <div class="hrow">${back?`<button class="bk" onclick="goHome()">‹</button>`:""}<h1>${title}</h1></div>
+  <div class="hud"><span>Nivel <b id="lvl"></b></span><span class="xpbar"><b id="xpb"></b></span><span>⭐ <b id="xp"></b></span><span>🔥 <b id="stk"></b></span></div></header>`;
+}
+function hud(){ if(!$("lvl")) return; $("lvl").textContent=Math.floor(S.xp/100)+1; $("xp").textContent=S.xp; $("stk").textContent=S.streak; $("xpb").style.width=(S.xp%100)+"%"; }
+
+// ============================ INICIO ============================
+function goHome(){ if(synth) synth.cancel(); screen="home"; renderHome(); window.scrollTo(0,0); }
+function renderHome(){
+  const nWrong=Object.keys(S.wrong).length;
+  app.innerHTML = header("💪 Irregular Verbs") + `<div class="wrap">
+  <div class="card"><h2>1. Elige un grupo</h2>
+    <div class="blocks">${BLOCKS.map(b=>`<button class="block ${sel===b.id?"sel":""}" style="background:${b.color}" onclick="pick('${b.id}')">
+      <div><b>${b.name}</b><br><small>${b.verbs.length} verbos · ${b.verbs.slice(0,3).map(v=>v[0]).join(", ")}…</small></div>
+      <div><small>${blockPct(b.id)}% dominado</small><div class="mbar"><i style="width:${blockPct(b.id)}%"></i></div></div></button>`).join("")}</div>
+    <div class="chiprow" style="margin-top:10px">
+      <button class="chipb ${sel==="all"?"on":""}" onclick="pick('all')">🎲 Todos mezclados</button>
+      <button class="chipb ${sel==="wrong"?"on":""}" onclick="pick('wrong')" ${nWrong?"":"disabled style='opacity:.45'"}>🎯 Mis difíciles (${nWrong})</button>
+    </div>
+  </div>
+  <div class="card"><h2>2. Elige cómo practicar</h2>
+    <div class="modes">
+      <button class="mode" onclick="startCards()"><span class="ic">🃏</span><b>Tarjetas</b><small>Estudia: toca para darle la vuelta</small></button>
+      <button class="mode" onclick="startQuiz('choose')"><span class="ic">👆</span><b>Elige</b><small>Test rápido de 4 opciones</small></button>
+      <button class="mode" onclick="startQuiz('write')"><span class="ic">✍️</span><b>Escribe</b><small>Pasado y participio, bien escritos</small></button>
+      <button class="mode" onclick="startQuiz('sent')"><span class="ic">💬</span><b>Frases</b><small>Completa la frase con la forma correcta</small></button>
+      <button class="mode" onclick="startQuiz('listen')"><span class="ic">🎧</span><b>Escucha</b><small>Oye el verbo y escribe las tres formas</small></button>
+      <button class="mode" onclick="renderList()"><span class="ic">📋</span><b>Mi lista</b><small>Todos los verbos y cuánto te los sabes</small></button>
+    </div>
+  </div>
+  <div class="card tip"><b>💡 Truco:</b> mejor 10 minutos cada día que una hora el domingo. Empieza siempre por <b>Tarjetas</b> y luego haz <b>Elige</b> o <b>Escribe</b> del mismo grupo.</div>
+  </div>`;
+  hud();
+}
+function pick(id){ sel=id; renderHome(); }
+function pool(){
+  if(sel==="all") return ALL.slice();
+  if(sel==="wrong"){ const w=ALL.filter(v=>S.wrong[v.inf]); return w.length?w:ALL.slice(); }
+  return ALL.filter(v=>v.b===sel);
+}
+function selName(){ return sel==="all"?"Todos":sel==="wrong"?"Mis difíciles":BLOCKS.find(b=>b.id===sel).name; }
+
+// ============================ TARJETAS ============================
+let cards=[], ci=0, known=0;
+function startCards(){ markDay(); cards=shuffle(pool()); ci=0; known=0; screen="cards"; renderCard(); }
+function renderCard(){
+  if(ci>=cards.length) return renderEnd(`Has repasado ${cards.length} tarjetas`, `Te sabías ${known} de ${cards.length}.`, known);
+  const v=cards[ci]; const blk=BLOCKS.find(b=>b.id===v.b);
+  app.innerHTML = header("🃏 "+selName(), true) + `<div class="wrap">
+  <div class="prog">${cards.map((_,i)=>`<i class="${i<ci?"ok":i===ci?"now":""}"></i>`).join("")}</div>
+  <div class="flip" onclick="flipCard(event)"><div class="fc" id="fc">
+    <div class="face front"><div class="inf">${v.inf}</div><div class="es">${v.es}</div>
+      <button class="spk" onclick="event.stopPropagation();speak('${v.inf}',0.8)">🔊 Escuchar</button>
+      <div class="tap">Toca la tarjeta para ver las formas</div></div>
+    <div class="face backf">
+      <div class="trio ${Math.max(v.inf.length,v.past.length,v.pp.length)>8?"sm":""}"><div class="t1"><small>Infinitivo</small><b>${v.inf}</b></div><div class="t2"><small>Pasado</small><b>${v.past}</b></div><div class="t3"><small>Participio</small><b>${v.pp}</b></div></div>
+      <button class="say" style="margin-top:8px" onclick="event.stopPropagation();sayForms(BY['${v.inf}'])">🔊 Oír las tres</button>
+      <div class="ex"><p>${hl(v.sp,v.past.split(" / ")[0])} <button class="say" onclick="event.stopPropagation();speak(hlTxt('${v.inf}','sp'))">🔊</button></p>
+      <p>${hl(v.spp,v.pp,"pp")} <button class="say" onclick="event.stopPropagation();speak(hlTxt('${v.inf}','spp'))">🔊</button></p></div>
+      <div class="trap" style="width:100%;text-align:left"><b class="h">⚠ La trampa:</b> ${v.trap}</div>
+    </div></div></div>
+  <div class="row"><button class="btn" onclick="cardAns(false)">🔁 Repasar</button><button class="btn g" onclick="cardAns(true)">✅ Me lo sé</button></div>
+  <p class="muted center" style="margin-top:12px">${blk.tip}</p></div>`;
+  hud();
+}
+function hlTxt(inf, which){ const v=BY[inf]; return which==="sp" ? v.sp.replace("___", v.past.split(" / ")[0]) : v.spp.replace("___", v.pp); }
+function flipCard(e){ $("fc").classList.toggle("on"); }
+function cardAns(ok){
+  const v=cards[ci];
+  if(ok){ known++; gain(2); S.m[v.inf]=Math.max(mastery(v.inf),1); save(); }
+  else { cards.push(v); S.wrong[v.inf]=S.wrong[v.inf]||1; save(); }
+  ci++; renderCard(); window.scrollTo(0,0);
+}
+
+// ============================ QUIZ ============================
+let Q=[], qi=0, mode="", res=[], answered=false;
+const TITLES={choose:"👆 Elige", write:"✍️ Escribe", sent:"💬 Frases", listen:"🎧 Escucha"};
+function startQuiz(m){
+  markDay(); mode=m; qi=0; res=[]; screen="quiz";
+  const base=shuffle(pool());
+  const n=Math.min(10, Math.max(base.length, 8));
+  Q=[]; let k=0; while(Q.length<n){ Q.push(base[k%base.length]); k++; }
+  Q=Q.map(v=>({v, kind: v.inf==="be"&&m==="sent" ? "pp" : (Math.random()<.5?"past":"pp")}));
+  renderQ();
+}
+function progBar(){ return `<div class="prog">${Q.map((_,i)=>`<i class="${i<qi?(res[i]?"ok":"ko"):i===qi?"now":""}"></i>`).join("")}</div>`; }
+function renderQ(){
+  if(qi>=Q.length){ const ok=res.filter(Boolean).length; return renderEnd(`${ok} de ${Q.length}`, ok===Q.length?"¡Perfecto! Ni un fallo.":ok>=Q.length*0.7?"¡Muy bien! Repasa los que fallaste.":"Vuelve a las Tarjetas de este grupo y repite.", ok); }
+  answered=false;
+  const {v,kind}=Q[qi]; const kname = kind==="past"?"pasado":"participio";
+  let body="";
+  if(mode==="choose"){
+    const right = kind==="past" ? v.past : v.pp;
+    const other = kind==="past" ? v.pp : v.past;
+    const cands = v.inf==="be" ? ["is"] : [regular(v.inf)];
+    if(norm(other)!==norm(right)) cands.push(other);
+    cands.push(v.inf);
+    shuffle(ALL.filter(x=>x.inf!==v.inf && x.b===v.b)).forEach(x=>cands.push(kind==="past"?x.past:x.pp));
+    const opts=[right]; for(const c of cands){ if(opts.length>=4) break; if(!opts.some(o=>norm(o)===norm(c))) opts.push(c); }
+    body = `<div class="q">¿Cuál es el ${kname}?</div><div class="qbig">${v.inf}</div><div class="qes">${v.es}</div>
+      <div class="opts">${shuffle(opts).map(o=>`<button class="opt" data-o="${o}" onclick="chooseAns(this)">${o}</button>`).join("")}</div>`;
+  } else if(mode==="write"){
+    body = `<div class="q">Escribe el pasado y el participio</div><div class="qbig">${v.inf} <button class="say" onclick="speak('${v.inf}')">🔊</button></div><div class="qes">${v.es}</div>
+      <label class="f">Pasado</label><input type="text" id="a1" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="next">
+      <label class="f">Participio</label><input type="text" id="a2" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="done">
+      <button class="btn p" style="margin-top:14px" id="chk" onclick="writeAns()">Comprobar</button>`;
+  } else if(mode==="sent"){
+    const s = kind==="past" ? v.sp : v.spp;
+    body = `<div class="q">Completa con el ${kname} de <span style="color:var(--purple)">${v.inf}</span></div>
+      <div class="sent">${s.replace("___",'<span class="gap">?</span>')}</div>
+      <button class="say" onclick="speak(BY['${v.inf}'].${kind==="past"?"sp":"spp"})">🔊 Escuchar la frase</button>
+      <input type="text" id="a1" style="margin-top:12px" placeholder="${v.inf} → ?" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="done">
+      <button class="btn p" style="margin-top:12px" id="chk" onclick="sentAns()">Comprobar</button>`;
+  } else if(mode==="listen"){
+    body = `<div class="q">Escucha y escribe las tres formas</div>
+      <div class="center" style="margin:10px 0"><button class="btn k" style="width:auto;padding:14px 22px" onclick="sayForms(BY['${v.inf}'])">🔊 Escuchar</button>
+      <button class="btn" style="width:auto;padding:14px 18px;margin-left:6px" onclick="speak('${v.inf}. ${v.past.replace(" / "," or ")}. ${v.pp}.',0.5)">🐢 Despacio</button></div>
+      <label class="f">Infinitivo</label><input type="text" id="a0" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="next">
+      <label class="f">Pasado</label><input type="text" id="a1" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="next">
+      <label class="f">Participio</label><input type="text" id="a2" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="done">
+      <button class="btn p" style="margin-top:14px" id="chk" onclick="listenAns()">Comprobar</button>`;
+  }
+  app.innerHTML = header(TITLES[mode]+" · "+selName(), true) + `<div class="wrap">${progBar()}<div class="card">${body}<div class="fb" id="fb"></div></div></div>`;
+  hud();
+  const ins=[...document.querySelectorAll("input[type=text]")];
+  ins.forEach((el,i)=>el.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); if(answered){ next(); } else if(i<ins.length-1) ins[i+1].focus(); else $("chk").click(); } }));
+  if(mode==="listen") setTimeout(()=>sayForms(v),350);
+}
+function finish(ok, html){
+  answered=true; res[qi]=ok; const v=Q[qi].v; bump(v.inf, ok);
+  if(ok) gain(mode==="choose"?5:mode==="listen"?12:10);
+  $("fb").innerHTML = html + `<button class="btn g" style="margin-top:12px" onclick="next()">${qi+1<Q.length?"Siguiente →":"Ver resultado"}</button>`;
+  if($("chk")) $("chk").classList.add("hidden");
+  document.activeElement && document.activeElement.blur && document.activeElement.blur();
+  setTimeout(()=>{ const f=$("fb"); if(f) f.scrollIntoView({behavior:"smooth",block:"nearest"}); },60);
+}
+function trapBox(v){ return `<div class="trap"><b class="h">⚠ La trampa:</b> ${v.trap}</div>`; }
+function forms(v){ return `<b>${v.inf}</b> · <b style="color:var(--pink)">${v.past}</b> · <b style="color:var(--teal)">${v.pp}</b>`; }
+function chooseAns(btn){
+  if(answered) return; const {v,kind}=Q[qi]; const right = kind==="past"?v.past:v.pp;
+  const ok = norm(btn.dataset.o)===norm(right);
+  document.querySelectorAll(".opt").forEach(b=>{ if(norm(b.dataset.o)===norm(right)) b.classList.add("ok"); else if(b===btn) b.classList.add("ko"); });
+  finish(ok, ok?`<div class="win">✅ ¡Eso es! ${forms(v)}</div>`:`<div class="lose">❌ Era <b>${right}</b>. ${forms(v)}</div>${trapBox(v)}`);
+}
+function mark(el, ok){ el.classList.add(ok?"ok":"ko"); el.readOnly=true; }
+function writeAns(){
+  if(answered) return; const {v}=Q[qi]; const a1=$("a1"), a2=$("a2");
+  if(!a1.value.trim()&&!a2.value.trim()){ a1.focus(); return; }
+  const o1=isOk(v,"past",a1.value), o2=isOk(v,"pp",a2.value); mark(a1,o1); mark(a2,o2);
+  const ok=o1&&o2;
+  finish(ok, ok?`<div class="win">✅ ¡Perfecto! ${forms(v)}</div>`:`<div class="lose">❌ Lo correcto es: ${forms(v)}</div>${trapBox(v)}`);
+}
+function sentAns(){
+  if(answered) return; const {v,kind}=Q[qi]; const a=$("a1"); if(!a.value.trim()){ a.focus(); return; }
+  let ok=isOk(v,kind,a.value);
+  if(v.inf==="be"&&kind==="past") ok = norm(a.value)==="was";
+  mark(a,ok);
+  const right = kind==="past" ? v.past.split(" / ")[0] : v.pp;
+  const full = (kind==="past"?v.sp:v.spp).replace("___",`<b>${right}</b>`);
+  let extra="";
+  if(!ok){ const t=norm(a.value);
+    if(kind==="pp" && t===norm(v.past) && v.past!==v.pp) extra=`<div class="trap"><b class="h">⚠ La trampa:</b> Has puesto el <b>pasado</b>. Después de <i>have / has</i> va el <b>participio</b>: <i>${v.pp}</i>.</div>`;
+    else if(kind==="past" && t===norm(v.pp) && v.past!==v.pp) extra=`<div class="trap"><b class="h">⚠ La trampa:</b> Has puesto el <b>participio</b>. Sin <i>have / has</i> delante, va el <b>pasado</b>: <i>${right}</i>.</div>`;
+    else if(t===regular(v.inf)) extra=`<div class="trap"><b class="h">⚠ La trampa:</b> <i>${v.inf}</i> es irregular: no lleva -ed. ${v.trap}</div>`;
+    else extra=trapBox(v);
+  }
+  finish(ok, ok?`<div class="win">✅ ${full}</div>`:`<div class="lose">❌ ${full}</div>${extra}`);
+}
+function listenAns(){
+  if(answered) return; const {v}=Q[qi]; const a0=$("a0"),a1=$("a1"),a2=$("a2");
+  if(!a0.value.trim()&&!a1.value.trim()&&!a2.value.trim()){ a0.focus(); return; }
+  const o0=norm(a0.value)===v.inf, o1=isOk(v,"past",a1.value), o2=isOk(v,"pp",a2.value);
+  mark(a0,o0); mark(a1,o1); mark(a2,o2); const ok=o0&&o1&&o2;
+  finish(ok, ok?`<div class="win">✅ ¡Oído fino! ${forms(v)}</div>`:`<div class="lose">❌ Era: ${forms(v)} <span class="muted">(${v.es})</span></div>${trapBox(v)}`);
+}
+function next(){ qi++; renderQ(); window.scrollTo(0,0); }
+
+// ============================ FIN DE RONDA ============================
+function renderEnd(title, msg, ok){
+  const total = screen==="cards" ? cards.length : Q.length;
+  const pct = total ? ok/total : 0;
+  const stars = pct===1?"⭐⭐⭐":pct>=.7?"⭐⭐":pct>=.4?"⭐":"💪";
+  if(screen==="quiz" && pct===1) gain(15);
+  const failed = screen==="quiz" ? [...new Set(Q.filter((_,i)=>!res[i]).map(q=>q.v.inf))] : [];
+  app.innerHTML = header("🏁 Ronda terminada", true) + `<div class="wrap"><div class="card center">
+    <div class="big">${stars}</div><h2 style="font-size:24px">${title}</h2><p class="muted">${msg}${screen==="quiz"&&pct===1?" +15 XP extra":""}</p></div>
+    ${failed.length?`<div class="card"><h2>Para repasar</h2>${failed.map(i=>`<div class="vrow" style="grid-template-columns:1fr 1fr 1fr"><b>${i}</b><span class="p1">${BY[i].past}</span><span class="p2">${BY[i].pp}</span></div>`).join("")}</div>`:""}
+    <div class="row"><button class="btn" onclick="goHome()">Inicio</button><button class="btn p" onclick="${screen==="cards"?"startCards()":`startQuiz('${mode}')`}">Otra ronda</button></div></div>`;
+  hud(); window.scrollTo(0,0);
+}
+
+// ============================ LISTA ============================
+function renderList(){
+  screen="list";
+  app.innerHTML = header("📋 Mi lista", true) + `<div class="wrap">
+  <div class="card"><p class="muted" style="margin:0">Las rayitas verdes indican cuánto dominas cada verbo. Toca un verbo para oír sus tres formas.</p></div>
+  ${BLOCKS.map(b=>`<div class="card"><h2 style="color:${b.color}">${b.name} <span class="muted">· ${blockPct(b.id)}%</span></h2>
+    <div class="vrow" style="font-size:12px;color:var(--grey);font-weight:700"><span>INFINITIVO</span><span>PASADO</span><span>PARTICIPIO</span><span></span></div>
+    ${b.verbs.map(v=>`<div class="vrow" onclick="sayForms(BY['${v[0]}'])"><span><b>${v[0]}</b><br><span class="muted" style="font-size:12px">${v[3]}</span></span><span class="p1">${v[1]}</span><span class="p2">${v[2]}</span>
+      <span class="dots">${[1,2,3,4,5].map(k=>`<i class="${mastery(v[0])>=k?"on":""}"></i>`).join("")}</span></div>`).join("")}</div>`).join("")}
+  <button class="btn" id="rst" onclick="resetAll()">Empezar de cero</button></div>`;
+  hud(); window.scrollTo(0,0);
+}
+function resetAll(){ const b=$("rst"); if(!b.dataset.c){ b.dataset.c=1; b.textContent="Pulsa otra vez para borrar tu progreso"; return; } S={...DEF,m:{},wrong:{},days:[]}; save(); renderList(); toast("Progreso borrado"); }
+
+renderHome();
+</script>
+</body>
+</html>
