@@ -178,7 +178,7 @@ function save(){ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){} }
 
 // ============================ SUPABASE ============================
 const SB_URL = "https://oyflrdchgjpirltznllu.supabase.co";
-const SB_KEY = "";   // clave pública (publishable / anon)
+const SB_KEY = "sb_publishable_Ac0nGoU9S88OFaLPkJnYIQ_RuMa7ahR";   // clave pública (publishable / anon)
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)));
 if(!S.dev){ S.dev=uuid(); save(); }
 if(!S.pending) S.pending=[];
