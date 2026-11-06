@@ -2,11 +2,31 @@
 --  Irregular Verbs · esquema de base de datos (Supabase / PostgreSQL)
 --  Ejecutar en: Supabase > SQL Editor > New query > Run
 --  Se puede ejecutar varias veces: crea lo que falta y actualiza lo que
---  ya existe (versión 2: cada respuesta se guarda al momento).
+--  ya existe (versión 3: inicio de sesión con Supabase Auth).
 -- =====================================================================
 
 -- Las vistas se recrean al final
 drop schema if exists informes cascade;
+
+-- ---------------------------------------------------------------------
+-- 0. Perfiles: datos de cada usuario de Supabase Auth (alumno o profe)
+--    Los usuarios se crean en Authentication > Users (ver usuarios.sql)
+-- ---------------------------------------------------------------------
+create table if not exists public.perfiles (
+  id         uuid primary key references auth.users(id) on delete cascade,
+  usuario    text not null unique check (usuario ~ '^[a-z0-9._-]{2,30}$'),
+  nombre     text not null check (char_length(nombre) between 1 and 40),
+  rol        text not null default 'alumno' check (rol in ('alumno','profe')),
+  creado_en  timestamptz not null default now()
+);
+
+-- ¿El usuario conectado es profe? (security definer para no entrar en bucle con RLS)
+create or replace function public.es_profe() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.perfiles where id = auth.uid() and rol = 'profe');
+$$;
+revoke execute on function public.es_profe() from public, anon;
+grant execute on function public.es_profe() to authenticated;
 
 -- ---------------------------------------------------------------------
 -- 1. Sesiones: una fila por ronda, se crea al contestar la primera
@@ -25,6 +45,7 @@ create table if not exists public.sesiones (
 );
 alter table public.sesiones add column if not exists total_previsto int check (total_previsto between 0 and 200);
 alter table public.sesiones add column if not exists iniciada_en timestamptz;
+alter table public.sesiones add column if not exists user_id uuid default auth.uid() references auth.users(id) on delete set null;
 alter table public.sesiones drop column if exists total;
 alter table public.sesiones drop column if exists aciertos;
 alter table public.sesiones drop column if exists duracion_seg;
@@ -47,27 +68,46 @@ create table if not exists public.respuestas (
 );
 alter table public.respuestas add column if not exists orden int check (orden between 1 and 500);
 alter table public.respuestas add column if not exists respondida_en timestamptz;
+alter table public.respuestas add column if not exists user_id uuid default auth.uid() references auth.users(id) on delete set null;
 
 create unique index if not exists respuestas_sesion_orden_uq on public.respuestas (sesion_id, orden);
 create index if not exists respuestas_alumno_verbo_idx on public.respuestas (alumno, verbo);
 create index if not exists sesiones_alumno_fecha_idx on public.sesiones (alumno, creada_en desc);
 
 -- ---------------------------------------------------------------------
--- 3. Seguridad: la app (rol anon) SOLO puede insertar.
+-- 3. Seguridad
+--    · Sin iniciar sesión (anon): nada de nada.
+--    · Alumno: inserta solo filas suyas y puede leer solo lo suyo.
+--    · Profe: además puede leer todo.
 -- ---------------------------------------------------------------------
+alter table public.perfiles   enable row level security;
 alter table public.sesiones   enable row level security;
 alter table public.respuestas enable row level security;
 
-revoke all on public.sesiones, public.respuestas from anon, authenticated;
-grant insert on public.sesiones, public.respuestas to anon;
+revoke all on public.perfiles, public.sesiones, public.respuestas from anon, authenticated;
+grant select on public.perfiles to authenticated;
+grant select, insert on public.sesiones, public.respuestas to authenticated;
 
-drop policy if exists "app inserta sesiones" on public.sesiones;
-create policy "app inserta sesiones" on public.sesiones
-  for insert to anon with check (true);
-
+drop policy if exists "app inserta sesiones"   on public.sesiones;
 drop policy if exists "app inserta respuestas" on public.respuestas;
-create policy "app inserta respuestas" on public.respuestas
-  for insert to anon with check (true);
+
+drop policy if exists "ver perfiles" on public.perfiles;
+create policy "ver perfiles" on public.perfiles
+  for select to authenticated using (id = auth.uid() or public.es_profe());
+
+drop policy if exists "insertar mis sesiones" on public.sesiones;
+create policy "insertar mis sesiones" on public.sesiones
+  for insert to authenticated with check (user_id = auth.uid());
+drop policy if exists "ver sesiones" on public.sesiones;
+create policy "ver sesiones" on public.sesiones
+  for select to authenticated using (user_id = auth.uid() or public.es_profe());
+
+drop policy if exists "insertar mis respuestas" on public.respuestas;
+create policy "insertar mis respuestas" on public.respuestas
+  for insert to authenticated with check (user_id = auth.uid());
+drop policy if exists "ver respuestas" on public.respuestas;
+create policy "ver respuestas" on public.respuestas
+  for select to authenticated using (user_id = auth.uid() or public.es_profe());
 
 -- ---------------------------------------------------------------------
 -- 4. Informes para ti (esquema aparte, NO expuesto a la app)
