@@ -197,9 +197,9 @@ async function flush(){
       const it=S.pending[0];
       if(!it.sesOk){ await sbInsert("sesiones",[it.sesion]); it.sesOk=true; save(); }
       if(it.respuestas.length) await sbInsert("respuestas",it.respuestas);
-      S.pending.shift(); save();
+      S.pending.shift(); S.lastErr=""; S.lastOk=new Date().toLocaleString("es-ES"); save();
     }
-  }catch(e){ console.warn("Sync pendiente:",e.message); }
+  }catch(e){ S.lastErr=e.message; save(); console.warn("Sync pendiente:",e.message); }
   flushing=false;
 }
 window.addEventListener("online",flush);
@@ -476,7 +476,10 @@ function renderList(){
     <div class="vrow" style="font-size:12px;color:var(--grey);font-weight:700"><span>INFINITIVO</span><span>PASADO</span><span>PARTICIPIO</span><span></span></div>
     ${b.verbs.map(v=>`<div class="vrow" onclick="sayForms(BY['${v[0]}'])"><span><b>${v[0]}</b><br><span class="muted" style="font-size:12px">${v[3]}</span></span><span class="p1">${v[1]}</span><span class="p2">${v[2]}</span>
       <span class="dots">${[1,2,3,4,5].map(k=>`<i class="${mastery(v[0])>=k?"on":""}"></i>`).join("")}</span></div>`).join("")}</div>`).join("")}
-  <div class="card"><p class="muted" style="margin:0">Practicas como <b>${S.alumno||"?"}</b>. <a href="#" onclick="renderWho();return false">Cambiar nombre</a>${S.pending.length?`<br>Rondas pendientes de enviar: ${S.pending.length} (se envían solas cuando haya conexión)`:""}</p></div>
+  <div class="card"><p class="muted" style="margin:0">Practicas como <b>${S.alumno||"?"}</b>. <a href="#" onclick="renderWho();return false">Cambiar nombre</a>${S.pending.length?`<br>Rondas pendientes de enviar: ${S.pending.length} (se envían solas cuando haya conexión)`:""}${S.lastOk?`<br>Último envío correcto: ${S.lastOk}`:""}</p>
+    ${S.pending.length?`<button class="btn" style="margin-top:10px" onclick="flush().then(renderList)">↻ Reintentar envío</button>`:""}
+    ${S.lastErr?`<p class="muted" style="margin:10px 0 0;color:var(--red);word-break:break-all">Error: ${S.lastErr.replace(/</g,"&lt;")}</p>`:""}
+    <p class="muted" style="margin:8px 0 0;font-size:12px">Versión 2 · registro activado</p></div>
   <button class="btn" id="rst" onclick="resetAll()">Empezar de cero</button></div>`;
   hud(); window.scrollTo(0,0);
 }
