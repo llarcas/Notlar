@@ -175,6 +175,49 @@ const KEY="irregulars_jonas_v1";
 const DEF={xp:0, m:{}, wrong:{}, days:[], streak:0};
 let S; try{ S=Object.assign({},DEF,JSON.parse(localStorage.getItem(KEY)||"{}")); }catch(e){ S={...DEF}; }
 function save(){ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){} }
+
+// ============================ SUPABASE ============================
+const SB_URL = "https://oyflrdchgjpirltznllu.supabase.co";
+const SB_KEY = "";   // clave pública (publishable / anon)
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)));
+if(!S.dev){ S.dev=uuid(); save(); }
+if(!S.pending) S.pending=[];
+async function sbInsert(table, rows){
+  const h={"apikey":SB_KEY,"Content-Type":"application/json","Prefer":"return=minimal"};
+  if(SB_KEY.startsWith("eyJ")) h["Authorization"]="Bearer "+SB_KEY;
+  const r=await fetch(`${SB_URL}/rest/v1/${table}`,{method:"POST",headers:h,body:JSON.stringify(rows)});
+  if(!r.ok) throw new Error(table+" "+r.status+" "+(await r.text()).slice(0,200));
+}
+let flushing=false;
+async function flush(){
+  if(!SB_KEY || flushing || !S.pending.length || !navigator.onLine) return;
+  flushing=true;
+  try{
+    while(S.pending.length){
+      const it=S.pending[0];
+      if(!it.sesOk){ await sbInsert("sesiones",[it.sesion]); it.sesOk=true; save(); }
+      if(it.respuestas.length) await sbInsert("respuestas",it.respuestas);
+      S.pending.shift(); save();
+    }
+  }catch(e){ console.warn("Sync pendiente:",e.message); }
+  flushing=false;
+}
+window.addEventListener("online",flush);
+// ---- registro de la ronda en curso
+let round=null;
+const MODO={choose:"elige",write:"escribe",sent:"frases",listen:"escucha",cards:"tarjetas"};
+function roundStart(m){ round={id:uuid(), modo:MODO[m], grupo:selName(), t0:Date.now(), log:[]}; }
+function roundLog(verbo, forma, respuesta, correcta){ if(round) round.log.push({verbo,forma,respuesta:String(respuesta||"").slice(0,120),correcta}); }
+function roundEnd(completa){
+  if(!round || !round.log.length){ round=null; return; }
+  const alumno=(S.alumno||"Sin nombre").slice(0,40);
+  S.pending.push({sesOk:false,
+    sesion:{id:round.id, alumno, dispositivo:S.dev, modo:round.modo, grupo:round.grupo.slice(0,60),
+            total:round.log.length, aciertos:round.log.filter(x=>x.correcta).length,
+            duracion_seg:Math.min(86400,Math.round((Date.now()-round.t0)/1000)), completa},
+    respuestas:round.log.map(x=>({sesion_id:round.id, alumno, ...x}))});
+  S.pending=S.pending.slice(-100); round=null; save(); flush();
+}
 const today=()=>new Date().toISOString().slice(0,10);
 function markDay(){
   const t=today(); if(S.days[S.days.length-1]===t) return;
@@ -229,8 +272,17 @@ function header(title, back){
 function hud(){ if(!$("lvl")) return; $("lvl").textContent=Math.floor(S.xp/100)+1; $("xp").textContent=S.xp; $("stk").textContent=S.streak; $("xpb").style.width=(S.xp%100)+"%"; }
 
 // ============================ INICIO ============================
-function goHome(){ if(synth) synth.cancel(); screen="home"; renderHome(); window.scrollTo(0,0); }
+function goHome(){ if(synth) synth.cancel(); if(round) roundEnd(false); screen="home"; renderHome(); window.scrollTo(0,0); }
+function renderWho(){
+  app.innerHTML = header("💪 Irregular Verbs") + `<div class="wrap"><div class="card">
+    <h2>👋 ¡Hola! ¿Cómo te llamas?</h2><p class="muted">Solo lo pide la primera vez. Así tu profe puede ver lo que vas practicando.</p>
+    <input type="text" id="who" maxlength="40" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Tu nombre" value="${S.alumno?S.alumno.replace(/"/g,""):""}">
+    <button class="btn p" style="margin-top:12px" onclick="saveWho()">Empezar</button></div></div>`;
+  hud(); const w=$("who"); w.addEventListener("keydown",e=>{ if(e.key==="Enter") saveWho(); });
+}
+function saveWho(){ const v=$("who").value.trim(); if(!v){ $("who").focus(); return; } S.alumno=v.slice(0,40); save(); renderHome(); }
 function renderHome(){
+  if(!S.alumno) return renderWho();
   const nWrong=Object.keys(S.wrong).length;
   app.innerHTML = header("💪 Irregular Verbs") + `<div class="wrap">
   <div class="card"><h2>1. Elige un grupo</h2>
@@ -266,9 +318,9 @@ function selName(){ return sel==="all"?"Todos":sel==="wrong"?"Mis difíciles":BL
 
 // ============================ TARJETAS ============================
 let cards=[], ci=0, known=0;
-function startCards(){ markDay(); cards=shuffle(pool()); ci=0; known=0; screen="cards"; renderCard(); }
+function startCards(){ markDay(); cards=shuffle(pool()); ci=0; known=0; screen="cards"; roundStart("cards"); renderCard(); }
 function renderCard(){
-  if(ci>=cards.length) return renderEnd(`Has repasado ${cards.length} tarjetas`, `Te sabías ${known} de ${cards.length}.`, known);
+  if(ci>=cards.length){ roundEnd(true); return renderEnd(`Has repasado ${cards.length} tarjetas`, `Te sabías ${known} de ${cards.length}.`, known); }
   const v=cards[ci]; const blk=BLOCKS.find(b=>b.id===v.b);
   app.innerHTML = header("🃏 "+selName(), true) + `<div class="wrap">
   <div class="prog">${cards.map((_,i)=>`<i class="${i<ci?"ok":i===ci?"now":""}"></i>`).join("")}</div>
@@ -290,7 +342,7 @@ function renderCard(){
 function hlTxt(inf, which){ const v=BY[inf]; return which==="sp" ? v.sp.replace("___", v.past.split(" / ")[0]) : v.spp.replace("___", v.pp); }
 function flipCard(e){ $("fc").classList.toggle("on"); }
 function cardAns(ok){
-  const v=cards[ci];
+  const v=cards[ci]; roundLog(v.inf,"tarjeta", ok?"me lo sé":"repasar", ok);
   if(ok){ known++; gain(2); S.m[v.inf]=Math.max(mastery(v.inf),1); save(); }
   else { cards.push(v); S.wrong[v.inf]=S.wrong[v.inf]||1; save(); }
   ci++; renderCard(); window.scrollTo(0,0);
@@ -300,7 +352,7 @@ function cardAns(ok){
 let Q=[], qi=0, mode="", res=[], answered=false;
 const TITLES={choose:"👆 Elige", write:"✍️ Escribe", sent:"💬 Frases", listen:"🎧 Escucha"};
 function startQuiz(m){
-  markDay(); mode=m; qi=0; res=[]; screen="quiz";
+  markDay(); mode=m; qi=0; res=[]; screen="quiz"; roundStart(m);
   const base=shuffle(pool());
   const n=Math.min(10, Math.max(base.length, 8));
   Q=[]; let k=0; while(Q.length<n){ Q.push(base[k%base.length]); k++; }
@@ -309,7 +361,7 @@ function startQuiz(m){
 }
 function progBar(){ return `<div class="prog">${Q.map((_,i)=>`<i class="${i<qi?(res[i]?"ok":"ko"):i===qi?"now":""}"></i>`).join("")}</div>`; }
 function renderQ(){
-  if(qi>=Q.length){ const ok=res.filter(Boolean).length; return renderEnd(`${ok} de ${Q.length}`, ok===Q.length?"¡Perfecto! Ni un fallo.":ok>=Q.length*0.7?"¡Muy bien! Repasa los que fallaste.":"Vuelve a las Tarjetas de este grupo y repite.", ok); }
+  if(qi>=Q.length){ roundEnd(true); const ok=res.filter(Boolean).length; return renderEnd(`${ok} de ${Q.length}`, ok===Q.length?"¡Perfecto! Ni un fallo.":ok>=Q.length*0.7?"¡Muy bien! Repasa los que fallaste.":"Vuelve a las Tarjetas de este grupo y repite.", ok); }
   answered=false;
   const {v,kind}=Q[qi]; const kname = kind==="past"?"pasado":"participio";
   let body="";
@@ -350,8 +402,10 @@ function renderQ(){
   ins.forEach((el,i)=>el.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); if(answered){ next(); } else if(i<ins.length-1) ins[i+1].focus(); else $("chk").click(); } }));
   if(mode==="listen") setTimeout(()=>sayForms(v),350);
 }
-function finish(ok, html){
+function finish(ok, html, given){
   answered=true; res[qi]=ok; const v=Q[qi].v; bump(v.inf, ok);
+  const k=Q[qi].kind==="past"?"pasado":"participio";
+  roundLog(v.inf, mode==="write"?"pasado+participio":mode==="listen"?"tres":k, given, ok);
   if(ok) gain(mode==="choose"?5:mode==="listen"?12:10);
   $("fb").innerHTML = html + `<button class="btn g" style="margin-top:12px" onclick="next()">${qi+1<Q.length?"Siguiente →":"Ver resultado"}</button>`;
   if($("chk")) $("chk").classList.add("hidden");
@@ -364,7 +418,7 @@ function chooseAns(btn){
   if(answered) return; const {v,kind}=Q[qi]; const right = kind==="past"?v.past:v.pp;
   const ok = norm(btn.dataset.o)===norm(right);
   document.querySelectorAll(".opt").forEach(b=>{ if(norm(b.dataset.o)===norm(right)) b.classList.add("ok"); else if(b===btn) b.classList.add("ko"); });
-  finish(ok, ok?`<div class="win">✅ ¡Eso es! ${forms(v)}</div>`:`<div class="lose">❌ Era <b>${right}</b>. ${forms(v)}</div>${trapBox(v)}`);
+  finish(ok, ok?`<div class="win">✅ ¡Eso es! ${forms(v)}</div>`:`<div class="lose">❌ Era <b>${right}</b>. ${forms(v)}</div>${trapBox(v)}`, btn.dataset.o);
 }
 function mark(el, ok){ el.classList.add(ok?"ok":"ko"); el.readOnly=true; }
 function writeAns(){
@@ -372,7 +426,7 @@ function writeAns(){
   if(!a1.value.trim()&&!a2.value.trim()){ a1.focus(); return; }
   const o1=isOk(v,"past",a1.value), o2=isOk(v,"pp",a2.value); mark(a1,o1); mark(a2,o2);
   const ok=o1&&o2;
-  finish(ok, ok?`<div class="win">✅ ¡Perfecto! ${forms(v)}</div>`:`<div class="lose">❌ Lo correcto es: ${forms(v)}</div>${trapBox(v)}`);
+  finish(ok, ok?`<div class="win">✅ ¡Perfecto! ${forms(v)}</div>`:`<div class="lose">❌ Lo correcto es: ${forms(v)}</div>${trapBox(v)}`, a1.value.trim()+" | "+a2.value.trim());
 }
 function sentAns(){
   if(answered) return; const {v,kind}=Q[qi]; const a=$("a1"); if(!a.value.trim()){ a.focus(); return; }
@@ -388,14 +442,14 @@ function sentAns(){
     else if(t===regular(v.inf)) extra=`<div class="trap"><b class="h">⚠ La trampa:</b> <i>${v.inf}</i> es irregular: no lleva -ed. ${v.trap}</div>`;
     else extra=trapBox(v);
   }
-  finish(ok, ok?`<div class="win">✅ ${full}</div>`:`<div class="lose">❌ ${full}</div>${extra}`);
+  finish(ok, ok?`<div class="win">✅ ${full}</div>`:`<div class="lose">❌ ${full}</div>${extra}`, a.value.trim());
 }
 function listenAns(){
   if(answered) return; const {v}=Q[qi]; const a0=$("a0"),a1=$("a1"),a2=$("a2");
   if(!a0.value.trim()&&!a1.value.trim()&&!a2.value.trim()){ a0.focus(); return; }
   const o0=norm(a0.value)===v.inf, o1=isOk(v,"past",a1.value), o2=isOk(v,"pp",a2.value);
   mark(a0,o0); mark(a1,o1); mark(a2,o2); const ok=o0&&o1&&o2;
-  finish(ok, ok?`<div class="win">✅ ¡Oído fino! ${forms(v)}</div>`:`<div class="lose">❌ Era: ${forms(v)} <span class="muted">(${v.es})</span></div>${trapBox(v)}`);
+  finish(ok, ok?`<div class="win">✅ ¡Oído fino! ${forms(v)}</div>`:`<div class="lose">❌ Era: ${forms(v)} <span class="muted">(${v.es})</span></div>${trapBox(v)}`, [a0,a1,a2].map(x=>x.value.trim()).join(" | "));
 }
 function next(){ qi++; renderQ(); window.scrollTo(0,0); }
 
@@ -422,12 +476,13 @@ function renderList(){
     <div class="vrow" style="font-size:12px;color:var(--grey);font-weight:700"><span>INFINITIVO</span><span>PASADO</span><span>PARTICIPIO</span><span></span></div>
     ${b.verbs.map(v=>`<div class="vrow" onclick="sayForms(BY['${v[0]}'])"><span><b>${v[0]}</b><br><span class="muted" style="font-size:12px">${v[3]}</span></span><span class="p1">${v[1]}</span><span class="p2">${v[2]}</span>
       <span class="dots">${[1,2,3,4,5].map(k=>`<i class="${mastery(v[0])>=k?"on":""}"></i>`).join("")}</span></div>`).join("")}</div>`).join("")}
+  <div class="card"><p class="muted" style="margin:0">Practicas como <b>${S.alumno||"?"}</b>. <a href="#" onclick="renderWho();return false">Cambiar nombre</a>${S.pending.length?`<br>Rondas pendientes de enviar: ${S.pending.length} (se envían solas cuando haya conexión)`:""}</p></div>
   <button class="btn" id="rst" onclick="resetAll()">Empezar de cero</button></div>`;
   hud(); window.scrollTo(0,0);
 }
-function resetAll(){ const b=$("rst"); if(!b.dataset.c){ b.dataset.c=1; b.textContent="Pulsa otra vez para borrar tu progreso"; return; } S={...DEF,m:{},wrong:{},days:[]}; save(); renderList(); toast("Progreso borrado"); }
+function resetAll(){ const b=$("rst"); if(!b.dataset.c){ b.dataset.c=1; b.textContent="Pulsa otra vez para borrar tu progreso"; return; } S={...DEF,m:{},wrong:{},days:[],alumno:S.alumno,dev:S.dev,pending:S.pending}; save(); renderList(); toast("Progreso borrado"); }
 
-renderHome();
+renderHome(); flush();
 </script>
 </body>
 </html>
