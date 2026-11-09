@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Irregular Verbs</title>
+<title>English Lab</title>
 <style>
 :root{--dark:#1E293B;--purple:#6C3FC5;--pink:#D6197A;--teal:#0D9488;--green:#16A34A;--gold:#B45309;--indigo:#4338CA;
 --greenl:#DCFCE7;--goldl:#FEF3C7;--redl:#FEE2E2;--red:#DC2626;--grey:#64748B;--bg:#F1F5F9;--line:#E2E8F0}
@@ -95,6 +95,12 @@ input.ok{border-color:var(--green);background:var(--greenl)}input.ko{border-colo
 .toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 14px);transform:translate(-50%,-140px);background:var(--dark);color:#fff;padding:12px 18px;border-radius:14px;font-weight:700;transition:transform .35s;z-index:9;max-width:90%;text-align:center}
 .toast.show{transform:translate(-50%,0)}
 .hidden{display:none!important}
+.zone{min-height:58px;border:2px dashed #CBD5E1;border-radius:14px;padding:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:#F8FAFC;margin-top:8px}
+.tile{background:#fff;border:2px solid var(--indigo);color:var(--indigo);padding:9px 13px;border-radius:12px;font-size:17px;font-weight:600;user-select:none;-webkit-user-select:none}
+.tile.on{background:var(--indigo);color:#fff}
+.punct{font-size:22px;font-weight:800;color:var(--indigo)}
+.hubcard{display:block;width:100%;border:0;border-radius:20px;padding:20px;text-align:left;color:#fff;margin-bottom:12px}
+.hubcard b{font-size:22px;display:block}.hubcard small{font-size:14px;opacity:.9}.hubcard .ic{font-size:34px}
 .tip{background:#EDE9FE;border-radius:14px;padding:12px;font-size:14.5px;line-height:1.45}
 </style>
 </head>
@@ -219,8 +225,8 @@ async function flush(keepalive){
   try{
     while(S.pending.length){
       const first=S.pending[0];
-      if(first.t==="sesiones"){
-        await sbInsert("sesiones",[first.row],keepalive);
+      if(first.t!=="respuestas"){
+        await sbInsert(first.t,[first.row],keepalive);
         S.pending.shift(); save(); continue;
       }
       let n=0; while(n<S.pending.length && n<50 && S.pending[n].t==="respuestas") n++;
@@ -239,13 +245,13 @@ document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==
 window.addEventListener("pagehide",()=>flush(true));
 // ---- registro: cada respuesta se guarda y se envía al momento
 let round=null;
-const MODO={choose:"elige",write:"escribe",sent:"frases",listen:"escucha",cards:"tarjetas"};
-function roundStart(m, previsto){ round={id:uuid(), modo:MODO[m], grupo:selName(), previsto, n:0, started:false, t0:new Date().toISOString()}; }
+const MODO={choose:"elige",write:"escribe",sent:"frases",listen:"escucha",cards:"tarjetas",w_order:"w-ordena",w_error:"w-error",w_trans:"w-transforma",w_conn:"w-conecta"};
+function roundStart(m, previsto, grupo, appName){ round={id:uuid(), modo:MODO[m], grupo:grupo||selName(), app:appName||"irregular-verbs", previsto, n:0, started:false, t0:new Date().toISOString()}; }
 function roundLog(verbo, forma, respuesta, correcta){
   if(!round) return;
   const alumno=((S.user&&S.user.usuario)||S.alumno||"sin-nombre").slice(0,40);
   if(!round.started){
-    S.pending.push({t:"sesiones", row:{id:round.id, alumno, dispositivo:S.dev, modo:round.modo, grupo:round.grupo.slice(0,60), total_previsto:round.previsto, iniciada_en:round.t0}});
+    S.pending.push({t:"sesiones", row:{id:round.id, alumno, dispositivo:S.dev, app:round.app, modo:round.modo, grupo:round.grupo.slice(0,60), total_previsto:round.previsto, iniciada_en:round.t0}});
     round.started=true;
   }
   round.n++;
@@ -301,17 +307,17 @@ function hl(sentence, form, cls){ return sentence.replace("___", `<b class="${cl
 
 // ============================ CABECERA ============================
 let screen="home", sel="b1";
-function header(title, back){
+function header(title, back, fn){
   return `<header><div class="stripes"><i style="background:#6C3FC5"></i><i style="background:#D6197A"></i><i style="background:#0D9488"></i><i style="background:#B45309"></i><i style="background:#4338CA"></i></div>
-  <div class="hrow">${back?`<button class="bk" onclick="goHome()">‹</button>`:""}<h1>${title}</h1></div>
+  <div class="hrow">${back?`<button class="bk" onclick="${fn||"goHome()"}">‹</button>`:""}<h1>${title}</h1></div>
   <div class="hud"><span>Nivel <b id="lvl"></b></span><span class="xpbar"><b id="xpb"></b></span><span>⭐ <b id="xp"></b></span><span>🔥 <b id="stk"></b></span></div></header>`;
 }
 function hud(){ if(!$("lvl")) return; $("lvl").textContent=Math.floor(S.xp/100)+1; $("xp").textContent=S.xp; $("stk").textContent=S.streak; $("xpb").style.width=(S.xp%100)+"%"; }
 
 // ============================ INICIO ============================
-function goHome(){ if(synth) synth.cancel(); if(round) roundEnd(); screen="home"; renderHome(); window.scrollTo(0,0); }
+function goHome(){ if(synth) synth.cancel(); if(round) roundEnd(); screen="home"; if(mod==="writing") renderWriting(); else if(mod==="verbs") renderVerbs(); else renderHome(); window.scrollTo(0,0); }
 function renderLogin(msg){
-  app.innerHTML = header("💪 Irregular Verbs") + `<div class="wrap"><div class="card">
+  app.innerHTML = header("📚 English Lab") + `<div class="wrap"><div class="card">
     <h2>🔐 Entrar</h2><p class="muted">Escribe tu usuario y tu contraseña.</p>
     <form id="lf" onsubmit="event.preventDefault();doLogin()">
     <label class="f">Usuario</label><input type="text" id="lu" autocomplete="username" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="next">
@@ -333,9 +339,21 @@ async function doLogin(){
 }
 function renderHome(){
   if(!S.user) return renderLogin();
-  const nWrong=Object.keys(S.wrong).length;
-  app.innerHTML = header("💪 Irregular Verbs") + `<div class="wrap">
+  mod="hub"; screen="hub";
+  app.innerHTML = header("📚 English Lab") + `<div class="wrap">
   <p class="muted" style="margin:0 4px 10px">Hola, <b>${S.user.nombre}</b>${isProfe()?" · 🎓 modo profe":""}</p>
+  <button class="hubcard" style="background:linear-gradient(135deg,#6C3FC5,#4338CA)" onclick="openVerbs()"><span class="ic">💪</span><b>Irregular Verbs</b><small>Tarjetas, test, frases y listening de los verbos irregulares</small></button>
+  <button class="hubcard" style="background:linear-gradient(135deg,#D6197A,#B45309)" onclick="openWriting()"><span class="ic">✍️</span><b>Writing</b><small>Ordena, corrige, transforma, une frases y escribe tus textos</small></button>
+  <div class="card tip"><b>💡</b> Un ratito cada día: 10 minutos de verbos y una ronda de Writing.</div>
+  <p class="center muted" style="margin-top:14px"><a href="#" onclick="logout();return false">Cerrar sesión</a></p>
+  </div>`;
+  hud();
+}
+function renderVerbs(){
+  if(!S.user) return renderLogin();
+  mod="verbs";
+  const nWrong=Object.keys(S.wrong).length;
+  app.innerHTML = header("💪 Irregular Verbs", true, "toHub()") + `<div class="wrap">
   <div class="card"><h2>1. Elige un grupo</h2>
     <div class="blocks">${BLOCKS.map(b=>`<button class="block ${sel===b.id?"sel":""}" style="background:${b.color}" onclick="pick('${b.id}')">
       <div><b>${b.name}</b><br><small>${b.verbs.length} verbos · ${b.verbs.slice(0,3).map(v=>v[0]).join(", ")}…</small></div>
@@ -359,7 +377,7 @@ function renderHome(){
   </div>`;
   hud();
 }
-function pick(id){ sel=id; renderHome(); }
+function pick(id){ sel=id; renderVerbs(); }
 function pool(){
   if(sel==="all") return ALL.slice();
   if(sel==="wrong"){ const w=ALL.filter(v=>S.wrong[v.inf]); return w.length?w:ALL.slice(); }
@@ -515,7 +533,7 @@ function renderEnd(title, msg, ok){
   app.innerHTML = header("🏁 Ronda terminada", true) + `<div class="wrap"><div class="card center">
     <div class="big">${stars}</div><h2 style="font-size:24px">${title}</h2><p class="muted">${msg}${screen==="quiz"&&pct===1?" +15 XP extra":""}</p></div>
     ${failed.length?`<div class="card"><h2>Para repasar</h2>${failed.map(i=>`<div class="vrow" style="grid-template-columns:1fr 1fr 1fr"><b>${i}</b><span class="p1">${BY[i].past}</span><span class="p2">${BY[i].pp}</span></div>`).join("")}</div>`:""}
-    <div class="row"><button class="btn" onclick="goHome()">Inicio</button><button class="btn p" onclick="${screen==="cards"?"startCards()":`startQuiz('${mode}')`}">Otra ronda</button></div></div>`;
+    <div class="row"><button class="btn" onclick="goHome()">Verbos</button><button class="btn p" onclick="${screen==="cards"?"startCards()":`startQuiz('${mode}')`}">Otra ronda</button></div></div>`;
   hud(); window.scrollTo(0,0);
 }
 
@@ -536,6 +554,272 @@ function renderList(){
   hud(); window.scrollTo(0,0);
 }
 function resetAll(){ const b=$("rst"); if(!b.dataset.c){ b.dataset.c=1; b.textContent="Pulsa otra vez para borrar tu progreso"; return; } S={...DEF,m:{},wrong:{},days:[],alumno:S.alumno,dev:S.dev,pending:S.pending,user:S.user}; save(); renderList(); toast("Progreso borrado"); }
+
+// ============================ MÓDULO WRITING ============================
+const W_ORDER = [
+  {w:["My grandparents","often","visit","us","at the weekend"], a:["my grandparents often visit us at the weekend","at the weekend my grandparents often visit us"], trap:"<i>often</i> va antes del verbo. El cuándo (<i>at the weekend</i>) al final o al principio."},
+  {w:["She","has","a","beautiful","old","guitar"], a:["she has a beautiful old guitar"], trap:"Los adjetivos van delante del nombre: primero la opinión (<i>beautiful</i>), luego la edad (<i>old</i>)."},
+  {w:["Where","did","you","buy","that jacket"], q:true, a:["where did you buy that jacket"], trap:"QASI: <i>Where</i> + <i>did</i> + <i>you</i> + <i>buy</i>. Después de <i>did</i>, verbo base."},
+  {w:["I","stayed","at home","because","it","was","raining"], a:["i stayed at home because it was raining"], trap:"<i>because</i> va en medio y une las dos ideas. Y la segunda frase también necesita sujeto: <i>it</i>."},
+  {w:["We","have","never","been","to London"], a:["we have never been to london"], trap:"<i>never</i> va entre <i>have</i> y el participio."},
+  {w:["My brother","doesn't","like","horror films"], a:["my brother doesn't like horror films"], trap:"Después de <i>doesn't</i>, verbo base: <i>like</i>."},
+  {w:["How often","does","your sister","practise","the piano"], q:true, a:["how often does your sister practise the piano"], trap:"QASI con <i>How often</i>: auxiliar <i>does</i> + sujeto + verbo base."},
+  {w:["They","played","cards","in the kitchen","after dinner"], a:["they played cards in the kitchen after dinner","after dinner they played cards in the kitchen"], trap:"Sujeto + verbo + objeto + dónde + cuándo."},
+  {w:["It","is","usually","cold","in January"], a:["it is usually cold in january","in january it is usually cold"], trap:"Con <i>be</i> (is), el adverbio va <b>después</b>: <i>is usually</i>."},
+  {w:["I","love","my dog","very much"], a:["i love my dog very much"], trap:"Nada entre el verbo y el objeto: <i>love my dog very much</i>."},
+  {w:["What","are","you","going to","do","tomorrow"], q:true, a:["what are you going to do tomorrow"], trap:"Pregunta con <i>going to</i>: <i>What</i> + <i>are</i> + <i>you</i> + <i>going to</i> + verbo."},
+  {w:["The museum","was","closed","so","we","went","to the park"], a:["the museum was closed so we went to the park"], trap:"<i>so</i> une la causa con la consecuencia: estaba cerrado, así que fuimos al parque."}
+];
+const W_ERROR = [
+  {s:"My father work in a hospital.", a:["My father works in a hospital."], c:"V", trap:"<i>My father</i> = <i>he</i>: el verbo lleva -s."},
+  {s:"Yesterday I go to the cinema with my cousin.", a:["Yesterday I went to the cinema with my cousin."], c:"T", trap:"<i>Yesterday</i> pide pasado: <i>went</i>."},
+  {s:"Is very hot today.", a:["It is very hot today."], c:"^", trap:"Falta el sujeto. Para el tiempo se usa <i>it</i>."},
+  {s:"She speaks very well English.", a:["She speaks English very well."], c:"WO", trap:"Nada entre el verbo y el objeto: <i>speaks English very well</i>."},
+  {s:"We have a house very big.", a:["We have a very big house."], c:"WO", trap:"El adjetivo va delante del nombre: <i>a very big house</i>."},
+  {s:"Did you saw the new film?", a:["Did you see the new film?"], c:"V", trap:"Después de <i>did</i>, verbo base: <i>see</i>."},
+  {s:"I like dogs becouse they are friendly.", a:["I like dogs because they are friendly."], c:"Sp", trap:"<i>because</i> se escribe con <b>au</b>."},
+  {s:"My sister doesn't likes coffee.", a:["My sister doesn't like coffee."], c:"V", trap:"La -s ya está en <i>doesn't</i>: el verbo va sin -s."},
+  {s:"They was at the beach last Sunday.", a:["They were at the beach last Sunday."], c:"V", trap:"<i>was</i> con I / he / she / it; <i>were</i> con you / we / they."},
+  {s:"Where you live?", a:["Where do you live?"], c:"^", trap:"Falta el auxiliar: QASI pide <i>Where</i> + <i>do</i> + <i>you</i> + <i>live</i>."},
+  {s:"I have see that film three times.", a:["I have seen that film three times."], c:"V", trap:"Con <i>have</i>, participio: <i>seen</i>."},
+  {s:"He always is late for school.", a:["He is always late for school."], c:"WO", trap:"Con <i>be</i>, el adverbio va después: <i>is always</i>."},
+  {s:"I am agree with you.", a:["I agree with you."], c:"X", trap:"En inglés <i>agree</i> ya es el verbo: no lleva <i>am</i>."},
+  {s:"There are many peoples in the square.", a:["There are many people in the square."], c:"Sp", trap:"<i>people</i> ya es plural: nunca lleva -s."}
+];
+const W_TRANS = [
+  {i:"Negativa", s:"She plays the violin.", a:["She doesn't play the violin."], trap:"Negativa en presente con <i>she</i>: <i>doesn't</i> + verbo base."},
+  {i:"Pregunta", s:"They live in Vigo.", a:["Do they live in Vigo?"], trap:"Pregunta con <i>they</i>: <i>Do</i> + sujeto + verbo base."},
+  {i:"Pasado", s:"I eat a sandwich.", a:["I ate a sandwich."], trap:"<i>eat</i> es irregular: <i>ate</i>."},
+  {i:"Negativa", s:"We went to the museum.", a:["We didn't go to the museum."], trap:"Negativa en pasado: <i>didn't</i> + verbo base (<i>go</i>, no <i>went</i>)."},
+  {i:"Pregunta", s:"He watched the documentary.", a:["Did he watch the documentary?"], trap:"Pregunta en pasado: <i>Did</i> + sujeto + verbo base."},
+  {i:"Present perfect con never", s:"I see a whale.", a:["I have never seen a whale."], trap:"<i>have</i> + <i>never</i> + participio (<i>seen</i>)."},
+  {i:"Presente continuo", s:"My mum cooks dinner.", a:["My mum is cooking dinner."], trap:"<i>is</i> + verbo-ing: <i>cooking</i>."},
+  {i:"Cambia I por He", s:"I study every evening.", a:["He studies every evening."], trap:"Con <i>he</i>, -s. Y consonante + y → <i>ies</i>: <i>studies</i>."},
+  {i:"Pregunta", s:"Your brother has a bike.", a:["Does your brother have a bike?"], trap:"Con <i>does</i>, <i>has</i> vuelve a <i>have</i>."},
+  {i:"Pasado", s:"We buy fruit at the market.", a:["We bought fruit at the market."], trap:"<i>buy</i> es irregular: <i>bought</i>."},
+  {i:"Negativa", s:"It is raining.", a:["It isn't raining."], trap:"Con <i>be</i> basta con añadir <i>not</i>: <i>is not</i> / <i>isn't</i>."},
+  {i:"Going to (plan)", s:"I visit my aunt tomorrow.", a:["I am going to visit my aunt tomorrow."], trap:"Planes: <i>am / is / are going to</i> + verbo base."}
+];
+const W_CONN = [
+  {p:["I was tired.","I went to bed early."], k:"so", a:["I was tired, so I went to bed early."], trap:"<i>so</i> = así que: causa, so, consecuencia."},
+  {p:["I like cats.","I prefer dogs."], k:"but", a:["I like cats, but I prefer dogs."], trap:"<i>but</i> = pero: une dos ideas que contrastan."},
+  {p:["She stayed at home.","She was ill."], k:"because", a:["She stayed at home because she was ill.","Because she was ill, she stayed at home."], trap:"<i>because</i> va delante de la razón. La segunda parte sigue necesitando sujeto: <i>she</i>."},
+  {p:["We had lunch.","We went to the beach."], k:"and then", a:["We had lunch and then we went to the beach.","We had lunch and then went to the beach."], trap:"<i>and then</i> = y luego: ordena lo que pasó primero y después."},
+  {p:["It was cold.","We didn't go out."], k:"so", a:["It was cold, so we didn't go out."], trap:"<i>so</i>: hacía frío, así que no salimos."},
+  {p:["My brother plays the guitar.","He sings in a choir."], k:"and", a:["My brother plays the guitar and he sings in a choir.","My brother plays the guitar and sings in a choir."], trap:"<i>and</i> suma dos ideas del mismo sujeto."},
+  {p:["The film was long.","I loved it."], k:"but", a:["The film was long, but I loved it."], trap:"<i>but</i> marca el contraste: larga, pero me encantó."},
+  {p:["I'm happy.","It's my birthday."], k:"because", a:["I'm happy because it's my birthday.","Because it's my birthday, I'm happy."], trap:"<i>because</i> + la razón: <i>it's my birthday</i>."},
+  {p:["I was six.","I lived in Lugo."], k:"When…,", a:["When I was six, I lived in Lugo.","I lived in Lugo when I was six."], trap:"<i>When</i> al principio, con coma después de la primera parte."},
+  {p:["The test was difficult.","I passed it."], k:"However,", a:["The test was difficult. However, I passed it.","The test was difficult; however, I passed it."], trap:"<i>However</i> empieza una frase nueva y va seguido de coma."},
+  {p:["He was hungry.","He made a sandwich."], k:"so", a:["He was hungry, so he made a sandwich."], trap:"<i>so</i>: tenía hambre, así que se hizo un bocadillo."},
+  {p:["I want to go to the concert.","I don't have a ticket."], k:"but", a:["I want to go to the concert, but I don't have a ticket."], trap:"<i>but</i>: quiero ir, pero no tengo entrada."}
+];
+const W_TASKS = [
+  {id:"weekend", t:"My last weekend", tense:"Pasado simple", min:50, max:70, q:["Where did you go?","Who were you with?","What did you do?","Did you enjoy it? Why?"], start:"Last weekend I…"},
+  {id:"friend", t:"My best friend", tense:"Presente simple", min:50, max:70, q:["What's his or her name?","What does he or she look like?","What do you do together?","Why is he or she special?"], start:"My best friend is called…"},
+  {id:"day", t:"A day in my life", tense:"Presente simple + always, usually, never", min:50, max:70, q:["What time do you get up?","What do you usually do in the morning?","What do you do after school?","What do you never do?"], start:"I usually get up at…"},
+  {id:"place", t:"My favourite place", tense:"Presente simple", min:50, max:70, q:["What place is it?","Where is it?","What do you do there?","Why do you like it?"], start:"My favourite place is…"},
+  {id:"email", t:"An email to a friend about your holidays", tense:"Pasado simple", min:60, max:80, q:["Where did you go?","Where did you stay?","What did you do there?","What was the best part?"], start:"Hi Alex,\nHow are you? I'm writing to tell you about…"},
+  {id:"opinion", t:"Is it better to live in a city or in a village?", tense:"Presente simple + In my opinion", min:60, max:90, q:["What is your opinion?","Give two reasons.","What would the other side say?","Finish with a conclusion."], start:"In my opinion,…"}
+];
+const CONNECTORS = ["and","but","because","so","also","then","after that","finally","first","however","when","in my opinion","on the other hand","to sum up"];
+const CHECKLIST = ["Todas las frases tienen sujeto (también <i>it</i>)","Con he / she / it, el verbo en presente lleva -s","El tiempo verbal encaja (yesterday → pasado…)","Después de do / does / did, verbo base","Los adjetivos van delante del nombre","Mayúscula al empezar y punto al acabar"];
+const W_TYPES = {
+  w_order:{name:"Ordena la frase", ic:"🧩", data:W_ORDER, color:"#4338CA", desc:"Coloca las fichas en el orden correcto"},
+  w_error:{name:"Encuentra el error", ic:"🔎", data:W_ERROR, color:"#D6197A", desc:"Cada frase tiene un fallo: escríbela bien"},
+  w_trans:{name:"Transforma", ic:"🔄", data:W_TRANS, color:"#0D9488", desc:"Negativa, pregunta, pasado…"},
+  w_conn:{name:"Une con conectores", ic:"🔗", data:W_CONN, color:"#B45309", desc:"Junta dos frases en una con and, but, so…"}
+};
+const CODE_TXT = {WO:"WO · orden", Sp:"Sp · ortografía", V:"V · verbo", T:"T · tiempo", "^":"^ · falta una palabra", X:"X · sobra una palabra"};
+
+function wNorm(s){
+  return s.toLowerCase().replace(/[\u2018\u2019\u00b4`]/g,"'")
+    .replace(/\bcan't\b/g,"can not").replace(/\bwon't\b/g,"will not")
+    .replace(/n't\b/g," not").replace(/'m\b/g," am").replace(/'re\b/g," are").replace(/'ve\b/g," have").replace(/'ll\b/g," will")
+    .replace(/\b(it|he|she|that|what|where|there)'s\b/g,"$1 is")
+    .replace(/[.,!?;:\u2026"()]/g," ").replace(/\s+/g," ").trim();
+}
+const wOk = (typed, answers) => answers.some(a => wNorm(a) === wNorm(typed));
+
+// ---- navegación del módulo
+let mod = "hub";
+function toHub(){ if(round) roundEnd(); mod="hub"; renderHome(); window.scrollTo(0,0); }
+function openVerbs(){ mod="verbs"; renderVerbs(); window.scrollTo(0,0); }
+function openWriting(){ mod="writing"; renderWriting(); window.scrollTo(0,0); }
+
+function renderWriting(){
+  screen="whome";
+  const saved=(S.textos||[]).length;
+  app.innerHTML = header("✍️ Writing", true, "toHub()") + `<div class="wrap">
+  <div class="card"><h2>Ejercicios</h2><div class="modes">
+    ${Object.entries(W_TYPES).map(([k,t])=>`<button class="mode" onclick="wStart('${k}')"><span class="ic">${t.ic}</span><b>${t.name}</b><small>${t.desc}</small></button>`).join("")}
+  </div></div>
+  <div class="card"><h2>Redacciones</h2><p class="muted" style="margin-top:-4px">Textos cortos con guía. Al terminar, revísalo con la lista y corrige lo que haga falta.</p>
+    <div class="list">${W_TASKS.map(t=>`<button class="mode" style="width:100%" onclick="wTask('${t.id}')"><b>${t.t}</b><small>${t.tense} · ${t.min}–${t.max} palabras${S.drafts&&S.drafts[t.id]?" · ✏️ borrador guardado":""}</small></button>`).join("")}</div></div>
+  <button class="btn" onclick="wMine()">📂 Mis textos (${saved})</button>
+  <div class="card tip" style="margin-top:12px"><b>💡 Truco:</b> ten a mano las 6 reglas de oro del orden: sujeto siempre, adjetivo delante, nada entre verbo y objeto, adverbios antes del verbo, S + V + O + dónde + cuándo, y preguntas QASI.</div>
+  </div>`;
+  hud();
+}
+
+// ---- rondas de ejercicios
+let WQ=[], wqi=0, wtype="", wres=[], wdone=false, wPlaced=[], wBank=[];
+function wStart(type){
+  markDay(); wtype=type; wqi=0; wres=[]; screen="wquiz";
+  WQ = shuffle(W_TYPES[type].data.map((x,i)=>({...x, id:type.replace("w_","")+"-"+(W_TYPES[type].data.indexOf(x)+1)}))).slice(0,8);
+  roundStart(type, WQ.length, W_TYPES[type].name, "writing");
+  wRender();
+}
+function wProg(){ return `<div class="prog">${WQ.map((_,i)=>`<i class="${i<wqi?(wres[i]?"ok":"ko"):i===wqi?"now":""}"></i>`).join("")}</div>`; }
+function wRender(){
+  if(wqi>=WQ.length){ roundEnd(); return wEnd(); }
+  wdone=false; const it=WQ[wqi]; const T=W_TYPES[wtype];
+  let body="";
+  const ta = (ph)=>`<textarea id="wa" rows="3" placeholder="${ph}" autocomplete="off" autocorrect="off" spellcheck="false" autocapitalize="sentences" style="width:100%;font-size:19px;padding:13px;border:2px solid #CBD5E1;border-radius:14px;font-family:inherit;margin-top:12px"></textarea>`;
+  if(wtype==="w_order"){
+    const tiles = it.w.map((w,i)=>({w,id:i}));
+    wBank = shuffle(tiles); wPlaced=[];
+    body = `<div class="q">Ordena la frase</div><div class="zone" id="wz"></div><p class="muted" style="margin:12px 0 6px">Toca una ficha para ponerla o quitarla:</p><div class="chiprow" id="wb"></div>`;
+  } else if(wtype==="w_error"){
+    body = `<div class="q">Encuentra el error y escribe la frase bien</div><div class="sent">${it.s}</div>${ta("Escribe la frase corregida")}`;
+  } else if(wtype==="w_trans"){
+    body = `<div class="q">Transforma: <span style="color:${T.color}">${it.i}</span></div><div class="sent">${it.s}</div>${ta("Escribe la nueva frase")}`;
+  } else {
+    body = `<div class="q">Une las dos frases con <span style="color:${T.color}">${it.k}</span></div><div class="sent">${it.p[0]}<br>${it.p[1]}</div>${ta("Escribe una sola frase")}`;
+  }
+  app.innerHTML = header(T.ic+" "+T.name, true) + `<div class="wrap">${wProg()}<div class="card">${body}
+    <button class="btn p" id="wchk" style="margin-top:12px" onclick="wCheck()">Comprobar</button><div class="fb" id="wfb"></div></div></div>`;
+  hud();
+  if(wtype==="w_order") wTiles();
+  else { const a=$("wa"); a.focus(); a.addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); wdone?wNext():wCheck(); } }); }
+}
+const W_KEEPCAP = new Set(["I"]);
+const lowTile = w => W_KEEPCAP.has(w) ? w : w.charAt(0).toLowerCase()+w.slice(1);
+function wTiles(){
+  const it=WQ[wqi]; const z=$("wz"), b=$("wb"); z.innerHTML=""; b.innerHTML="";
+  wPlaced.forEach((t,i)=>{ const e=document.createElement("span"); e.className="tile on"; e.textContent = i===0 ? t.w.charAt(0).toUpperCase()+t.w.slice(1) : lowTile(t.w); e.onclick=()=>{ if(wdone) return; wPlaced.splice(i,1); wTiles(); }; z.appendChild(e); });
+  if(wPlaced.length){ const p=document.createElement("span"); p.className="punct"; p.textContent=it.q?"?":"."; z.appendChild(p); }
+  wBank.filter(t=>!wPlaced.includes(t)).forEach(t=>{ const e=document.createElement("span"); e.className="tile"; e.textContent=lowTile(t.w); e.onclick=()=>{ if(wdone) return; wPlaced.push(t); wTiles(); }; b.appendChild(e); });
+}
+function wSolution(it){
+  if(wtype!=="w_order") return it.a[0];
+  let rest=it.a[0]; const seq=[];
+  while(rest){ const t=it.w.filter(w=>rest.startsWith(w.toLowerCase())&&(rest.length===w.length||rest[w.length]===" ")).sort((x,y)=>y.length-x.length)[0]; if(!t) break; seq.push(t); rest=rest.slice(t.length).trim(); }
+  const sj=seq.map((w,i)=>i===0?w.charAt(0).toUpperCase()+w.slice(1):lowTile(w)).join(" "); return sj+(it.q?"?":".");
+}
+function wCheck(){
+  if(wdone) return; const it=WQ[wqi]; let typed, ok;
+  if(wtype==="w_order"){ if(!wPlaced.length) return; typed=wPlaced.map(t=>t.w).join(" "); ok = it.a.includes(typed.toLowerCase()); }
+  else { const a=$("wa"); typed=a.value.trim(); if(!typed){ a.focus(); return; } ok = wOk(typed, it.a); a.readOnly=true; a.style.borderColor = ok?"var(--green)":"var(--red)"; a.style.background = ok?"var(--greenl)":"var(--redl)"; }
+  wdone=true; wres[wqi]=ok; roundLog(it.id, "frase", typed, ok);
+  if(ok) gain(wtype==="w_order"?8:10);
+  const sol=wSolution(it);
+  const code = wtype==="w_error" ? `<div class="muted" style="margin-top:6px">Tipo de error: <b>${CODE_TXT[it.c]}</b></div>` : "";
+  $("wfb").innerHTML = (ok ? `<div class="win">✅ ¡Bien!</div>` : `<div class="lose">❌ Así es correcta:<br><b style="font-size:18px">${sol}</b></div>`)
+    + code + `<div class="trap"><b class="h">⚠ La trampa:</b> ${it.trap}</div>`
+    + `<button class="btn g" style="margin-top:12px" onclick="wNext()">${wqi+1<WQ.length?"Siguiente →":"Ver resultado"}</button>`;
+  $("wchk").classList.add("hidden");
+  setTimeout(()=>{ const f=$("wfb"); if(f) f.scrollIntoView({behavior:"smooth",block:"nearest"}); },60);
+}
+function wNext(){ wqi++; wRender(); window.scrollTo(0,0); }
+function wEnd(){
+  const ok=wres.filter(Boolean).length, n=WQ.length, pct=ok/n;
+  if(pct===1) gain(15);
+  const stars = pct===1?"⭐⭐⭐":pct>=.7?"⭐⭐":pct>=.4?"⭐":"💪";
+  app.innerHTML = header("🏁 Ronda terminada", true) + `<div class="wrap"><div class="card center">
+    <div class="big">${stars}</div><h2 style="font-size:24px">${ok} de ${n}</h2>
+    <p class="muted">${pct===1?"¡Perfecto! +15 XP extra":pct>=.7?"¡Muy bien! Repasa las trampas de las que fallaste.":"Repasa las reglas del Writing Toolkit y vuelve a intentarlo."}</p></div>
+    <div class="row"><button class="btn" onclick="goHome()">Writing</button><button class="btn p" onclick="wStart('${wtype}')">Otra ronda</button></div></div>`;
+  hud(); window.scrollTo(0,0);
+}
+
+// ---- redacciones
+let wtask=null, wRevised=false, wT0=0;
+function wWords(t){ return (t.trim().match(/[A-Za-z']+/g)||[]).length; }
+function wConnectors(t){ const l=" "+t.toLowerCase().replace(/[^a-z' ]+/g," ").replace(/\s+/g," ")+" "; return CONNECTORS.filter(c=>l.includes(" "+c+" ")); }
+function wTask(id){
+  markDay(); wtask=W_TASKS.find(t=>t.id===id); wRevised=false; wT0=Date.now(); screen="wtask";
+  const draft=(S.drafts&&S.drafts[id])||"";
+  app.innerHTML = header("📝 Redacción", true) + `<div class="wrap"><div class="card">
+    <h2 style="font-size:20px">${wtask.t}</h2>
+    <p class="muted" style="margin-top:-4px">${wtask.tense} · entre ${wtask.min} y ${wtask.max} palabras</p>
+    <div class="tip" style="margin:8px 0"><b>Ideas para tu texto:</b><br>${wtask.q.map(x=>"• "+x).join("<br>")}</div>
+    <textarea id="wtxt" rows="10" autocomplete="off" autocorrect="off" spellcheck="false" autocapitalize="sentences" placeholder="${wtask.start.replace(/\n/g," ")}" style="width:100%;font-size:17px;line-height:1.5;padding:13px;border:2px solid #CBD5E1;border-radius:14px;font-family:inherit">${draft.replace(/</g,"&lt;")}</textarea>
+    <div class="row muted" style="margin-top:6px;font-size:13px"><span id="wcount"></span><span id="wconn" style="text-align:right"></span></div>
+    <button class="btn k" style="margin-top:12px" onclick="wReview()">🔍 Revisar mi texto</button>
+    <div id="wrev"></div>
+    <button class="btn g hidden" id="wfin" style="margin-top:12px" onclick="wFinish()">✅ Terminar</button>
+  </div></div>`;
+  hud();
+  const ta=$("wtxt"); ta.addEventListener("input",()=>{ wCounters(); S.drafts=S.drafts||{}; S.drafts[id]=ta.value; save(); }); wCounters();
+}
+function wCounters(){
+  const t=$("wtxt").value, n=wWords(t), c=wConnectors(t);
+  const col = n<wtask.min?"var(--gold)":n>wtask.max?"var(--red)":"var(--green)";
+  $("wcount").innerHTML=`<b style="color:${col}">${n}</b> / ${wtask.min}–${wtask.max} palabras`;
+  $("wconn").innerHTML=`Conectores: <b style="color:${c.length>=3?"var(--green)":"var(--gold)"}">${c.length}</b>${c.length?" ("+c.join(", ")+")":""}`;
+}
+const MISSPELL = {becouse:"because",beacuse:"because",becuse:"because",bicause:"because",beautifull:"beautiful",beatiful:"beautiful",freind:"friend",frend:"friend",wich:"which",realy:"really",tomorow:"tomorrow",diferent:"different",intresting:"interesting",interesing:"interesting",wensday:"Wednesday",wednsday:"Wednesday",favorit:"favourite",favourit:"favourite",peaple:"people",pepole:"people",thier:"their",studing:"studying",swiming:"swimming",runing:"running",stoped:"stopped",goed:"went",buyed:"bought",eated:"ate",writed:"wrote",catched:"caught",thinked:"thought",teached:"taught",payed:"paid",sayed:"said",knowed:"knew",maked:"made",taked:"took",seed:"saw",comed:"came",becomed:"became",drinked:"drank",swimmed:"swam",flied:"flew",tryed:"tried",familly:"family",grandmather:"grandmother",whit:"with"};
+const PAST_IRR = ["went","saw","ate","wrote","bought","took","made","came","drank","swam","flew","gave","knew","spoke","broke","chose","drove","fell","forgot","began","sang","wore","grew","drew","thought","taught","caught","brought","told","sold","sent","slept","felt","met","found","heard","left","lost","paid","said","won","got","sat","had","did","ran","became","understood"];
+function wHints(text){
+  const H=[]; const t=" "+text.replace(/\s+/g," ")+" ";
+  if(/(^|[\s.!?])i[\s',.!?]/.test(text)) H.push({c:"Sp", m:"Escribe <b>I</b> (yo) siempre en mayúscula."});
+  const sentences = text.split(/(?<=[.!?])\s+|\n+/).map(s=>s.trim()).filter(Boolean);
+  if(sentences.some(s=>/^[a-z]/.test(s))) H.push({c:"Sp", m:"Hay alguna frase que empieza en minúscula."});
+  if(text.trim() && !/[.!?]$/.test(text.trim())) H.push({c:"Sp", m:"Termina el texto con un punto."});
+  const noSubj = sentences.filter(s=>/^(is|was|are|were)\s+(very|really|so|too|a|an|cold|hot|sunny|rainy|windy|nice|great|fun|boring|beautiful|amazing|my|the)\b/i.test(s) && !/\?$/.test(s));
+  if(noSubj.length) H.push({c:"^", m:`Parece que falta el sujeto en: “${noSubj[0].slice(0,40)}…”. ¿Falta <i>It</i> o <i>He / She</i>?`});
+  const didPast = t.match(new RegExp(`\\b(did|didn't|did not|does|doesn't|does not|do|don't|do not)\\s+(\\w+\\s+)?(${PAST_IRR.join("|")}|\\w+ed)\\b`,"i"));
+  if(didPast) H.push({c:"V", m:`“${didPast[0].trim()}”: después de <i>do / does / did</i> va el verbo base.`});
+  const s3dont = t.match(/\b(he|she|it|my (mum|mother|dad|father|sister|brother|friend|cousin|teacher|grandmother|grandfather|aunt|uncle))\s+don't\b/i);
+  if(s3dont) H.push({c:"V", m:`“${s3dont[0].trim()}”: con he / she / it se usa <i>doesn't</i>.`});
+  const s3have = t.match(/\b(he|she|it)\s+have\b/i);
+  if(s3have) H.push({c:"V", m:`“${s3have[0].trim()}”: con he / she / it se usa <i>has</i>.`});
+  const s3was = t.match(/\b(they|we|you)\s+was\b/i);
+  if(s3was) H.push({c:"V", m:`“${s3was[0].trim()}”: con they / we / you se usa <i>were</i>.`});
+  const vm = t.match(/\b(like|love|enjoy|hate|speak|play)s?\s+very\s+(much|well)\s+[a-z]+/i);
+  if(vm && !/\b(very (much|well))\s+(and|but|because|so|in|at|on|with|when)\b/i.test(vm[0])) H.push({c:"WO", m:`“${vm[0].trim()}”: <i>very much / very well</i> va después del objeto.`});
+  const freqBefore = t.match(/\b(always|usually|often|never|sometimes)\s+(is|am|are|was|were)\b/i);
+  if(freqBefore) H.push({c:"WO", m:`“${freqBefore[0].trim()}”: con <i>be</i>, el adverbio va después (<i>is always</i>).`});
+  const agree = t.match(/\b(am|is|are)\s+agree\b/i);
+  if(agree) H.push({c:"X", m:`“${agree[0].trim()}”: se dice <i>I agree</i>, sin <i>am</i>.`});
+  const words = (text.toLowerCase().match(/[a-z']+/g)||[]);
+  const ms=[...new Set(words.filter(w=>MISSPELL[w]))];
+  ms.forEach(w=>H.push({c:/ed$/.test(w)&&MISSPELL[w]!==w.slice(0,-2)?"V":"Sp", m:`“${w}” → se escribe <b>${MISSPELL[w]}</b>.`}));
+  const n=wWords(text); if(n<wtask.min) H.push({c:"+", m:`Te faltan unas ${wtask.min-n} palabras para llegar al mínimo.`}); if(n>wtask.max) H.push({c:"+", m:`Te pasas de ${wtask.max} palabras: intenta resumir un poco.`});
+  if(wConnectors(text).length<3) H.push({c:"+", m:"Usa al menos 3 conectores (and, but, because, so, then…)."});
+  return H;
+}
+function wReview(){
+  const text=$("wtxt").value; if(wWords(text)<5){ $("wtxt").focus(); return; }
+  wRevised=true; const H=wHints(text);
+  $("wrev").innerHTML = `<div style="margin-top:12px">${H.length?`<div class="trap"><b class="h">🔍 Pistas para mejorar (${H.length}):</b><br>${H.map(h=>`• <b>${h.c==="+"?"":h.c+" ·"}</b> ${h.m}`).join("<br>")}</div>`:`<div class="win">✅ No veo fallos típicos. ¡Buen trabajo!</div>`}
+    <div class="card" style="margin:10px 0 0;padding:12px;background:#F8FAFC"><b>Repásalo tú también:</b>${CHECKLIST.map((c,i)=>`<label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-size:15px"><input type="checkbox" style="width:20px;height:20px;flex:none"> <span>${c}</span></label>`).join("")}</div>
+    <p class="muted" style="margin:8px 0 0">Corrige lo que quieras arriba y vuelve a pulsar Revisar. Cuando estés contento, pulsa Terminar.</p></div>`;
+  $("wfin").classList.remove("hidden");
+}
+function wFinish(){
+  const text=$("wtxt").value.trim(); if(!text) return;
+  const H=wHints(text), n=wWords(text), c=wConnectors(text);
+  const alumno=((S.user&&S.user.usuario)||S.alumno||"sin-nombre").slice(0,40);
+  const item={id:uuid(), tarea:wtask.t, texto:text.slice(0,4000), palabras:n, conectores:c.length, pistas:H.length, fecha:new Date().toISOString()};
+  S.textos=(S.textos||[]); S.textos.unshift(item); S.textos=S.textos.slice(0,50);
+  if(S.drafts) delete S.drafts[wtask.id];
+  S.pending.push({t:"redacciones", row:{id:item.id, alumno, dispositivo:S.dev, tarea:item.tarea.slice(0,80), texto:item.texto, palabras:n, conectores:c.length, pistas:H.length, minutos:Math.round((Date.now()-wT0)/6000)/10, escrita_en:item.fecha}});
+  save(); flush();
+  gain(H.length===0?30:20);
+  app.innerHTML = header("📝 ¡Texto terminado!", true) + `<div class="wrap"><div class="card center"><div class="big">${H.length===0?"🌟":"👏"}</div>
+    <h2>${wtask.t}</h2><p class="muted">${n} palabras · ${c.length} conectores · +${H.length===0?30:20} XP</p></div>
+    <div class="card" style="white-space:pre-wrap;line-height:1.55">${text.replace(/</g,"&lt;")}</div>
+    <div class="row"><button class="btn" onclick="goHome()">Writing</button><button class="btn p" onclick="wMine()">📂 Mis textos</button></div></div>`;
+  hud(); window.scrollTo(0,0);
+}
+function wMine(){
+  screen="wmine"; const L=S.textos||[];
+  app.innerHTML = header("📂 Mis textos", true) + `<div class="wrap">${L.length?L.map((x,i)=>`<div class="card"><details><summary style="font-weight:700;cursor:pointer">${x.tarea}<br><span class="muted" style="font-weight:400">${new Date(x.fecha).toLocaleDateString("es-ES")} · ${x.palabras} palabras</span></summary>
+    <div style="white-space:pre-wrap;line-height:1.55;margin-top:10px">${x.texto.replace(/</g,"&lt;")}</div></details></div>`).join(""):`<div class="card"><p class="muted" style="margin:0">Todavía no has terminado ningún texto. ¡Empieza por una redacción!</p></div>`}</div>`;
+  hud(); window.scrollTo(0,0);
+}
 
 renderHome(); flush();
 </script>

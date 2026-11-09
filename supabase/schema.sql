@@ -2,7 +2,7 @@
 --  Irregular Verbs · esquema de base de datos (Supabase / PostgreSQL)
 --  Ejecutar en: Supabase > SQL Editor > New query > Run
 --  Se puede ejecutar varias veces: crea lo que falta y actualiza lo que
---  ya existe (versión 4: usuarios propios, sin Supabase Auth).
+--  ya existe (versión 5: módulo Writing con ejercicios y redacciones).
 -- =====================================================================
 
 create extension if not exists pgcrypto with schema extensions;
@@ -81,6 +81,9 @@ alter table public.sesiones drop column if exists aciertos;
 alter table public.sesiones drop column if exists duracion_seg;
 alter table public.sesiones drop column if exists completa;
 alter table public.sesiones drop column if exists user_id;
+alter table public.sesiones drop constraint if exists sesiones_modo_check;
+alter table public.sesiones add constraint sesiones_modo_check check (modo in
+  ('tarjetas','elige','escribe','frases','escucha','w-ordena','w-error','w-transforma','w-conecta'));
 
 -- ---------------------------------------------------------------------
 -- 2. Respuestas: una fila por pregunta, se envía al contestarla
@@ -100,6 +103,27 @@ create table if not exists public.respuestas (
 alter table public.respuestas add column if not exists orden int check (orden between 1 and 500);
 alter table public.respuestas add column if not exists respondida_en timestamptz;
 alter table public.respuestas drop column if exists user_id;
+alter table public.respuestas drop constraint if exists respuestas_forma_check;
+alter table public.respuestas add constraint respuestas_forma_check check (forma in
+  ('pasado','participio','pasado+participio','tres','tarjeta','frase'));
+comment on column public.respuestas.verbo is 'Verbo, o id del ejercicio en Writing (p. ej. error-3)';
+
+-- ---------------------------------------------------------------------
+-- 2b. Redacciones del módulo Writing
+-- ---------------------------------------------------------------------
+create table if not exists public.redacciones (
+  id           uuid primary key,                        -- lo genera la app
+  alumno       text not null check (char_length(alumno) between 1 and 40),
+  dispositivo  uuid,
+  tarea        text not null check (char_length(tarea) <= 80),
+  texto        text not null check (char_length(texto) <= 4000),
+  palabras     int  check (palabras between 0 and 2000),
+  conectores   int  check (conectores between 0 and 100),
+  pistas       int  check (pistas between 0 and 100),     -- avisos automáticos que quedaban al terminar
+  minutos      numeric(6,1) check (minutos between 0 and 1440),
+  escrita_en   timestamptz,                              -- hora del móvil
+  creada_en    timestamptz not null default now()
+);
 
 create unique index if not exists respuestas_sesion_orden_uq on public.respuestas (sesion_id, orden);
 create index if not exists respuestas_alumno_verbo_idx on public.respuestas (alumno, verbo);
@@ -109,11 +133,16 @@ create index if not exists sesiones_alumno_fecha_idx on public.sesiones (alumno,
 -- 3. Seguridad: la app (rol anon) SOLO puede insertar en sesiones y
 --    respuestas, y llamar a entrar(). Nada más.
 -- ---------------------------------------------------------------------
-alter table public.sesiones   enable row level security;
-alter table public.respuestas enable row level security;
+alter table public.sesiones    enable row level security;
+alter table public.respuestas  enable row level security;
+alter table public.redacciones enable row level security;
 
-revoke all on public.sesiones, public.respuestas from anon, authenticated;
-grant insert on public.sesiones, public.respuestas to anon;
+revoke all on public.sesiones, public.respuestas, public.redacciones from anon, authenticated;
+grant insert on public.sesiones, public.respuestas, public.redacciones to anon;
+
+drop policy if exists "app inserta redacciones" on public.redacciones;
+create policy "app inserta redacciones" on public.redacciones
+  for insert to anon with check (true);
 
 drop policy if exists "app inserta sesiones" on public.sesiones;
 create policy "app inserta sesiones" on public.sesiones
@@ -134,7 +163,7 @@ create view informes.rondas as
 select s.id,
        s.alumno,
        (coalesce(s.iniciada_en, s.creada_en) at time zone 'Europe/Madrid') as inicio,
-       s.modo, s.grupo,
+       s.app, s.modo, s.grupo,
        s.total_previsto,
        count(r.id)                                  as contestadas,
        count(r.id) filter (where r.correcta)        as aciertos,
@@ -188,4 +217,22 @@ select alumno, modo,
        round(100.0 * sum(aciertos) / nullif(sum(contestadas),0)) as pct_acierto
 from informes.rondas
 group by alumno, modo
+order by alumno, rondas desc;
+
+-- Redacciones, de la más reciente a la más antigua
+create view informes.redacciones as
+select coalesce(escrita_en, creada_en) at time zone 'Europe/Madrid' as cuando,
+       alumno, tarea, palabras, conectores, pistas, minutos, texto
+from public.redacciones
+order by cuando desc;
+
+-- Ejercicios de Writing: aciertos por tipo
+create view informes.writing_por_tipo as
+select alumno, modo, grupo as ejercicio,
+       count(*) as rondas,
+       sum(contestadas) as frases,
+       round(100.0 * sum(aciertos) / nullif(sum(contestadas),0)) as pct_acierto
+from informes.rondas
+where app = 'writing'
+group by alumno, modo, grupo
 order by alumno, rondas desc;
